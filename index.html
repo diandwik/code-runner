@@ -1,0 +1,2496 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#070d1f">
+<title>Code Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   style.css — tampilan HUD, overlay, kuis, dashboard (gaya pixel)
+   Ukuran memakai satuan cqw agar skala mengikuti lebar layar game.
+   ============================================================ */
+/* ---------- Dasar & stage 16:9 (1920x1080) ---------- */
+:root {
+  --px: 'Press Start 2P', 'Courier New', monospace;
+  --txt: 'Segoe UI', Verdana, Arial, sans-serif;
+  --blue: #5aa7ff;
+  --navy: #14295a;
+  --gold: #ffb703;
+  --sl: env(safe-area-inset-left, 0px);
+  --sr: env(safe-area-inset-right, 0px);
+  --st: env(safe-area-inset-top, 0px);
+  --sb: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #070d1f; color: #fff; font-family: var(--txt); overscroll-behavior: none; }
+body { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--st) var(--sr) var(--sb) var(--sl); }
+[hidden] { display: none !important; }
+
+#stage {
+  position: relative;
+  /* selalu 16:9, muat di layar (letterbox), memperhitungkan area aman (notch) */
+  width: min(calc(100vw - var(--sl) - var(--sr)), calc((100vh - var(--st) - var(--sb)) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  container-type: inline-size;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 0 4px #1c3a78;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  touch-action: none;
+}
+@supports (height: 100dvh) {
+  #stage { width: min(calc(100vw - var(--sl) - var(--sr)), calc((100dvh - var(--st) - var(--sb)) * 16 / 9)); }
+}
+#stage > * { --u: 1cqw; }              /* 1 satuan = 1% lebar layar game */
+#game { width: 100%; height: 100%; display: block; }
+
+/* Layar lebih kecil: perbesar teks & tombol secara proporsional */
+@container (max-width: 1100px) {
+  #stage > .overlay { --u: 1.12cqw; }
+  #stage > #hud, #stage > #hud-sub, #stage > #toast, #stage > #touch, #stage > #watermark { --u: 1.05cqw; }
+}
+@container (max-width: 820px) {
+  #stage > .overlay { --u: 1.25cqw; }
+  #stage > #hud, #stage > #hud-sub, #stage > #toast, #stage > #touch, #stage > #watermark { --u: 1.15cqw; }
+}
+@container (max-width: 560px) {
+  #stage > .overlay { --u: 1.4cqw; }
+  #stage > #hud, #stage > #hud-sub, #stage > #toast, #stage > #touch, #stage > #watermark { --u: 1.25cqw; }
+}
+
+/* ---------------- HUD ---------------- */
+#hud {
+  position: absolute; left: 0; right: 0; top: 0;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: calc(1.1 * var(--u)) calc(1.4 * var(--u)); gap: calc(1 * var(--u)); pointer-events: none;
+}
+#hud .center { display: flex; gap: calc(1 * var(--u)); }
+.box {
+  display: flex; align-items: center; gap: calc(.9 * var(--u));
+  background: linear-gradient(#16367a, #0e2556);
+  border: calc(.28 * var(--u)) solid var(--blue);
+  border-radius: calc(.9 * var(--u));
+  padding: calc(.5 * var(--u)) calc(1.1 * var(--u));
+  box-shadow: 0 calc(.25 * var(--u)) 0 #08163a, inset 0 0 0 calc(.15 * var(--u)) #0a1d47;
+}
+.box small { display: block; font: calc(.8 * var(--u)) var(--px); color: #ffcf4d; margin-bottom: calc(.45 * var(--u)); }
+.box b { font: calc(1.8 * var(--u)) var(--px); color: #fff; }
+#time.low { color: #ff6b6b; animation: blink .6s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+
+#hud-player canvas { width: calc(4.6 * var(--u)); height: calc(4.6 * var(--u)); image-rendering: pixelated; border-radius: calc(.6 * var(--u)); border: calc(.2 * var(--u)) solid #fff; background: #bfe3ff; }
+.pinfo { display: flex; flex-direction: column; gap: calc(.5 * var(--u)); }
+#pname { font: calc(1.5 * var(--u)) var(--px); color: #fff; }
+#hearts { display: flex; gap: calc(.3 * var(--u)); }
+#hearts img { height: calc(2 * var(--u)); image-rendering: pixelated; }
+
+.coin-ico { width: calc(3 * var(--u)); height: calc(3 * var(--u)); border-radius: 50%; border: calc(.2 * var(--u)) solid #8a5200;
+  background: radial-gradient(circle at 35% 35%, #ffe680, #f4a800 60%, #b36b00); }
+.clock-ico { width: calc(3 * var(--u)); height: calc(3 * var(--u)); border-radius: 50%; border: calc(.3 * var(--u)) solid #cfe6ff; background: #fff; position: relative; }
+.clock-ico::before, .clock-ico::after { content: ''; position: absolute; left: 50%; top: 50%; background: #1b2f66; transform-origin: 0 0; }
+.clock-ico::before { width: calc(.2 * var(--u)); height: calc(1 * var(--u)); transform: translate(-50%, -100%); }
+.clock-ico::after { width: calc(.8 * var(--u)); height: calc(.2 * var(--u)); }
+.box.target { background: linear-gradient(#e0892f, #b8641a); border-color: #ffc266; box-shadow: 0 calc(.25 * var(--u)) 0 #6e3a0d; }
+.box.target small { color: #fff3d0; }
+.school-ico { font-size: calc(2.6 * var(--u)); line-height: 1; }
+
+#hud-sub { position: absolute; left: calc(1.5 * var(--u)); bottom: calc(1 * var(--u)); font: calc(.8 * var(--u)) var(--px); color: #fff; text-shadow: 0 calc(.15 * var(--u)) 0 #000; opacity: .85; pointer-events: none; }
+#hud-sub b { color: #ffcf4d; }
+
+#toast {
+  position: absolute; left: 50%; top: 14%; transform: translate(-50%, -10px);
+  background: rgba(10, 25, 60, .92); border: calc(.25 * var(--u)) solid var(--blue); border-radius: calc(.8 * var(--u));
+  padding: calc(.8 * var(--u)) calc(1.6 * var(--u)); font: calc(1.2 * var(--u)) var(--px); color: #fff; opacity: 0; pointer-events: none; transition: all .25s; white-space: nowrap; z-index: 5;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------------- Overlay & panel ---------------- */
+.overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8, 16, 40, .8); z-index: 10; }
+.overlay.show { display: flex; }
+.panel {
+  background: linear-gradient(#17316a, #0f2250);
+  border: calc(.3 * var(--u)) solid var(--blue); border-radius: calc(1.1 * var(--u));
+  box-shadow: 0 calc(.5 * var(--u)) 0 #08163a, 0 0 calc(3 * var(--u)) rgba(0, 0, 0, .6);
+  padding: calc(1.8 * var(--u)) calc(2.4 * var(--u)); max-width: 88%; max-height: 94%; overflow: auto; text-align: center; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+}
+.panel.small { min-width: calc(34 * var(--u)); }
+.panel h1 { font: calc(4.6 * var(--u))/1.25 var(--px); margin: 0 0 calc(1 * var(--u)); color: #ffcf4d; text-shadow: 0 calc(.4 * var(--u)) 0 #8a5200, 0 calc(.8 * var(--u)) 0 rgba(0,0,0,.4); }
+.panel h2 { font: calc(1.9 * var(--u))/1.4 var(--px); margin: 0 0 calc(1.2 * var(--u)); color: #ffcf4d; }
+.panel p { font-size: calc(1.3 * var(--u)); line-height: 1.5; margin: calc(.6 * var(--u)) 0; color: #dbe9ff; }
+.panel .sub { max-width: calc(46 * var(--u)); margin: 0 auto calc(1.2 * var(--u)); }
+.panel .tip { font-size: calc(1.05 * var(--u)); opacity: .85; }
+
+.name { display: block; font: calc(.95 * var(--u)) var(--px); color: #ffcf4d; margin: calc(.8 * var(--u)) 0 calc(1.2 * var(--u)); }
+.name input {
+  display: block; margin: calc(.8 * var(--u)) auto 0; width: calc(20 * var(--u)); text-align: center;
+  font: calc(1.5 * var(--u)) var(--px); color: #fff; background: #0a1a40; border: calc(.25 * var(--u)) solid var(--blue); border-radius: calc(.6 * var(--u)); padding: calc(.7 * var(--u));
+}
+.name input:focus { outline: none; border-color: var(--gold); }
+
+.row { display: flex; gap: calc(1 * var(--u)); justify-content: center; flex-wrap: wrap; margin-top: calc(1.2 * var(--u)); }
+.btn {
+  font: calc(1.15 * var(--u)) var(--px); background: var(--gold); color: #3a2200; border: 0; border-bottom: calc(.35 * var(--u)) solid #b37400;
+  padding: calc(.9 * var(--u)) calc(1.6 * var(--u)); border-radius: calc(.7 * var(--u)); cursor: pointer;
+}
+.btn:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(2px); border-bottom-width: calc(.15 * var(--u)); }
+.btn.alt { background: #4a86d9; color: #fff; border-bottom-color: #25508f; }
+.btn.danger { background: #c0392b; color: #fff; border-bottom-color: #7a1f16; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.best { font-size: calc(1.15 * var(--u)); color: #ffcf4d; margin-top: calc(1 * var(--u)); min-height: calc(1.5 * var(--u)); }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: calc(.5 * var(--u)) calc(2 * var(--u)); margin: calc(1.4 * var(--u)) auto calc(.6 * var(--u)); font-size: calc(1.05 * var(--u)); color: #dbe9ff; text-align: left; max-width: calc(52 * var(--u)); }
+kbd { background: #e8eefc; color: #14295a; border-radius: calc(.3 * var(--u)); border-bottom: calc(.2 * var(--u)) solid #8aa0d0; padding: calc(.1 * var(--u)) calc(.5 * var(--u)); font: calc(.95 * var(--u)) var(--px); margin: 0 calc(.15 * var(--u)); }
+
+/* ---------------- Kuis ---------------- */
+.panel.quiz { width: calc(64 * var(--u)); text-align: left; }
+.qhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(1 * var(--u)); }
+.badge { font: calc(1.1 * var(--u)) var(--px); padding: calc(.6 * var(--u)) calc(1.1 * var(--u)); border-radius: calc(.5 * var(--u)); color: #fff; background: #e44d26; }
+.badge.HTML { background: #e44d26; }
+.badge.CSS { background: #2965f1; }
+.badge.JS { background: #f7df1e; color: #222; }
+.qbonus { font: calc(1 * var(--u)) var(--px); color: #7dffa5; }
+.panel.quiz h2 { font: calc(1.9 * var(--u))/1.5 var(--txt); font-weight: 700; color: #fff; margin: 0 0 calc(1.2 * var(--u)); }
+#q-opts { display: grid; grid-template-columns: 1fr 1fr; gap: calc(.8 * var(--u)); }
+.opt {
+  display: flex; gap: calc(1 * var(--u)); align-items: center; width: 100%; text-align: left;
+  background: #1c3b82; border: calc(.25 * var(--u)) solid #4a86d9; color: #fff; border-radius: calc(.8 * var(--u));
+  padding: calc(.9 * var(--u)) calc(1 * var(--u)); font: calc(1.35 * var(--u)) var(--txt); cursor: pointer; font-family: Consolas, 'Courier New', monospace;
+}
+.opt:hover:not(:disabled) { background: #2a55b5; }
+.opt .k { font: calc(1 * var(--u)) var(--px); background: var(--gold); color: #3a2200; border-radius: calc(.4 * var(--u)); padding: calc(.5 * var(--u)) calc(.7 * var(--u)); flex: none; }
+.opt.correct { background: #1f8a43; border-color: #7dffa5; }
+.opt.wrong { background: #a3262f; border-color: #ff8d94; }
+.opt.gone { opacity: .25; text-decoration: line-through; }
+.opt:disabled { cursor: default; }
+.hintbox { margin-top: calc(1 * var(--u)); background: #3a2f0a; border: calc(.25 * var(--u)) dashed var(--gold); border-radius: calc(.7 * var(--u)); padding: calc(.8 * var(--u)) calc(1 * var(--u)); font-size: calc(1.25 * var(--u)); color: #ffe9a8; }
+.feedback { margin-top: calc(1 * var(--u)); border-radius: calc(.7 * var(--u)); padding: calc(.9 * var(--u)) calc(1.1 * var(--u)); font-size: calc(1.3 * var(--u)); line-height: 1.5; }
+.feedback.ok { background: rgba(31, 138, 67, .35); border: calc(.25 * var(--u)) solid #7dffa5; }
+.feedback.no { background: rgba(163, 38, 47, .35); border: calc(.25 * var(--u)) solid #ff8d94; }
+.feedback b { display: block; font: calc(1.15 * var(--u)) var(--px); margin-bottom: calc(.5 * var(--u)); }
+.qfoot { display: flex; justify-content: space-between; align-items: center; margin-top: calc(1.2 * var(--u)); gap: calc(1 * var(--u)); }
+.btn.hint { background: #6b4fd6; color: #fff; border-bottom-color: #3d2a99; }
+.btn.hint .cost { color: #ffd23f; margin-left: calc(.6 * var(--u)); }
+
+/* ---------------- Tabel skor ---------------- */
+table { border-collapse: collapse; margin: calc(1 * var(--u)) auto; }
+.stats td { padding: calc(.5 * var(--u)) calc(1.2 * var(--u)); font-size: calc(1.35 * var(--u)); text-align: left; }
+.stats td:last-child { text-align: right; font: calc(1.2 * var(--u)) var(--px); color: #ffcf4d; }
+.board { width: 100%; min-width: calc(46 * var(--u)); }
+.board th { font: calc(.9 * var(--u)) var(--px); color: #ffcf4d; padding: calc(.6 * var(--u)) calc(.8 * var(--u)); border-bottom: calc(.2 * var(--u)) solid var(--blue); text-align: left; }
+.board td { font-size: calc(1.25 * var(--u)); padding: calc(.55 * var(--u)) calc(.8 * var(--u)); border-bottom: calc(.1 * var(--u)) solid rgba(255, 255, 255, .12); text-align: left; }
+.board td.n { font: calc(1.1 * var(--u)) var(--px); text-align: right; color: #ffcf4d; }
+.board tr.me td { background: rgba(255, 207, 77, .2); }
+.board tr.empty td { text-align: center; opacity: .7; }
+.bigscore small { display: block; font: calc(.9 * var(--u)) var(--px); color: #ffcf4d; margin-bottom: calc(.6 * var(--u)); }
+.bigscore b { font: calc(3.2 * var(--u)) var(--px); }
+.rank { color: #7dffa5 !important; font-weight: 700; }
+.summary { font-size: calc(1.3 * var(--u)); color: #dbe9ff; }
+.summary b { color: #ffcf4d; }
+
+/* ---------------- Menu (2 kolom, cocok untuk 16:9) ---------------- */
+.panel.menu {
+  display: grid; grid-template-columns: 1fr 1.05fr; gap: calc(3 * var(--u)); align-items: center;
+  width: calc(80 * var(--u)); padding: calc(2.2 * var(--u)) calc(3 * var(--u));
+}
+.panel.menu h1 { font-size: calc(5.4 * var(--u)); }
+.panel.menu .sub { max-width: none; font-size: calc(1.35 * var(--u)); }
+.panel.menu .name { margin-top: 0; }
+.panel.menu .name input { width: 100%; max-width: calc(30 * var(--u)); font-size: calc(1.7 * var(--u)); padding: calc(.9 * var(--u)); }
+.panel.menu .controls { grid-template-columns: 1fr; max-width: none; margin: calc(1.2 * var(--u)) auto 0; gap: calc(.45 * var(--u)); }
+.name input::placeholder { color: #5f7bb5; }
+.err { color: #ff8d94; font-weight: 700; font-size: calc(1.15 * var(--u)); margin-top: calc(-.5 * var(--u)); }
+.shake { animation: shake .35s; border-color: #ff8d94 !important; }
+@keyframes shake { 20%, 60% { transform: translateX(-.8cqw); } 40%, 80% { transform: translateX(.8cqw); } }
+.row.tight { margin-top: calc(.7 * var(--u)); }
+.btn.small { font-size: calc(.95 * var(--u)); padding: calc(.6 * var(--u)) calc(1.2 * var(--u)); }
+
+/* ---------------- Perangkat sentuh vs keyboard ---------------- */
+.touch-only { display: none !important; }
+html.touch .touch-only { display: grid !important; }
+html.touch .kbd-only { display: none !important; }
+html.touch .btn { padding: calc(1.3 * var(--u)) calc(1.9 * var(--u)); }
+html.touch .opt { padding: calc(1.2 * var(--u)) calc(1.1 * var(--u)); }
+html.touch #hud-sub { left: 50%; transform: translateX(-50%); bottom: calc(.8 * var(--u)); }
+
+/* ---------------- Kontrol sentuh ---------------- */
+#touch { position: absolute; inset: 0; display: none; z-index: 6; pointer-events: none; }
+html.touch body[data-state="playing"] #touch { display: block; }
+.tbtn {
+  width: calc(8.4 * var(--u)); height: calc(8.4 * var(--u)); padding: 0; margin: 0;
+  display: grid; place-items: center; border-radius: 50%;
+  border: calc(.4 * var(--u)) solid rgba(111, 176, 255, .9);
+  background: rgba(14, 37, 86, .45); color: #fff;
+  font: calc(3 * var(--u)) var(--px); line-height: 1;
+  pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+.tbtn.on { background: rgba(255, 183, 3, .85); color: #3a2200; border-color: #fff3d0; }
+#dpad {
+  position: absolute; left: calc(1.6 * var(--u)); bottom: calc(.8 * var(--u));
+  display: flex; gap: calc(1.4 * var(--u)); padding: calc(1 * var(--u));
+  pointer-events: auto; touch-action: none;
+}
+#dpad .tbtn { pointer-events: none; width: calc(9 * var(--u)); height: calc(9 * var(--u)); }
+#actions {
+  position: absolute; right: calc(1.6 * var(--u)); bottom: calc(1.6 * var(--u));
+  display: flex; align-items: flex-end; gap: calc(1.8 * var(--u));
+}
+.tbtn.jump { width: calc(10.5 * var(--u)); height: calc(10.5 * var(--u)); font-size: calc(3.6 * var(--u)); }
+.tbtn.run { width: calc(7.4 * var(--u)); height: calc(7.4 * var(--u)); font-size: calc(1.2 * var(--u)); }
+#tutil { position: absolute; top: calc(8.8 * var(--u)); right: calc(1.4 * var(--u)); display: flex; gap: calc(.9 * var(--u)); }
+.tutil {
+  width: calc(4.8 * var(--u)); height: calc(4.8 * var(--u)); padding: 0; border-radius: 50%;
+  border: calc(.3 * var(--u)) solid rgba(111, 176, 255, .9); background: rgba(14, 37, 86, .6); color: #fff;
+  font: calc(1.9 * var(--u)) var(--txt); line-height: 1; pointer-events: auto; cursor: pointer; touch-action: manipulation;
+}
+.tutil:active { background: rgba(255, 183, 3, .85); color: #3a2200; }
+
+/* ---------------- Permintaan memutar layar (HP portrait) ---------------- */
+#rotate {
+  position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px; padding: 24px; text-align: center; background: #070d1f;
+}
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 700px) {
+  #rotate:not(.dismissed) { display: flex; }
+}
+#rotate .phone { font-size: 18vw; line-height: 1; animation: turn 2.6s ease-in-out infinite; }
+@keyframes turn { 0%, 15% { transform: rotate(0); } 55%, 100% { transform: rotate(-90deg); } }
+#rotate h2 { font: 5vw/1.5 var(--px); color: #ffcf4d; margin: 0; }
+#rotate p { font-size: 4vw; line-height: 1.5; color: #dbe9ff; margin: 0; }
+#rotate button { margin-top: 12px; font: 3vw var(--px); background: transparent; color: #9db8e8; border: 2px solid #4a86d9; border-radius: 10px; padding: 12px 16px; }
+
+/* ---------------- Watermark footer ---------------- */
+#watermark {
+  position: absolute; left: 50%; bottom: calc(.5 * var(--u)); transform: translateX(-50%);
+  z-index: 30; pointer-events: none; white-space: nowrap;
+  font: 700 calc(1.05 * var(--u)) var(--txt); letter-spacing: .04em; color: rgba(255, 255, 255, .8);
+  text-shadow: 0 calc(.15 * var(--u)) calc(.3 * var(--u)) rgba(0, 0, 0, .9), 0 0 calc(.6 * var(--u)) rgba(0, 0, 0, .6);
+}
+html.touch #hud-sub { bottom: calc(2.3 * var(--u)); }
+
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <canvas id="game" width="1920" height="1080"></canvas>
+
+  <!-- ============ HUD ============ -->
+  <div id="hud" hidden>
+    <div class="box" id="hud-player">
+      <canvas id="avatar" width="48" height="48"></canvas>
+      <div class="pinfo"><span id="pname">Pemain</span><div id="hearts"></div></div>
+    </div>
+    <div class="center">
+      <div class="box"><span class="coin-ico"></span><div><small>Score</small><b id="score">0</b></div></div>
+      <div class="box"><span class="clock-ico"></span><div><small>Time</small><b id="time">00:00</b></div></div>
+    </div>
+    <div class="box target"><span class="school-ico">🏫</span><div><small id="lvl">Level 1/5</small><b id="target">SMP BCI</b></div></div>
+  </div>
+  <div id="hud-sub" hidden>HI <b id="hiscore">0</b><span class="kbd-only"> &nbsp;·&nbsp; [P] Jeda &nbsp;·&nbsp; [M] Suara</span></div>
+  <div id="toast"></div>
+  <div id="watermark">IG : @buildwithms.d / @diandwik</div>
+
+  <!-- ============ KONTROL SENTUH ============ -->
+  <div id="touch" aria-label="Kontrol layar sentuh">
+    <div id="tutil">
+      <button class="tutil" id="t-pause" aria-label="Jeda">❚❚</button>
+      <button class="tutil" id="t-mute" aria-label="Suara">🔊</button>
+      <button class="tutil fs-only" id="t-fs" aria-label="Layar penuh">⛶</button>
+    </div>
+    <div id="dpad">
+      <button class="tbtn" data-k="left" aria-label="Kiri" tabindex="-1">◀</button>
+      <button class="tbtn" data-k="right" aria-label="Kanan" tabindex="-1">▶</button>
+    </div>
+    <div id="actions">
+      <button class="tbtn run" id="t-run" aria-label="Lari" tabindex="-1">LARI</button>
+      <button class="tbtn jump" id="t-jump" aria-label="Lompat" tabindex="-1">▲</button>
+    </div>
+  </div>
+
+  <!-- ============ MENU ============ -->
+  <section class="overlay show" id="menu">
+    <div class="panel menu">
+      <div class="m-left">
+        <h1>CODE<br>RUNNER</h1>
+        <p class="sub">Ketik namamu, lalu berlarilah menuju sekolah! Kumpulkan koin dan jawab soal dasar web: HTML · CSS · JavaScript.</p>
+        <p class="tip">Injak musuh bertopi merah untuk mengalahkannya. Musuh berduri ungu harus dilompati!</p>
+      </div>
+      <div class="m-right">
+        <label class="name" for="name-input">Nama karakter
+          <input id="name-input" maxlength="12" placeholder="Ketik namamu" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="go" inputmode="text">
+        </label>
+        <div id="name-err" class="err" hidden>Isi nama karakter dulu ya!</div>
+        <div class="row">
+          <button class="btn" id="btn-start">▶ Mulai Main</button>
+          <button class="btn alt" id="btn-board">🏆 Skor Tertinggi</button>
+        </div>
+        <div class="row tight fs-only"><button class="btn alt small" id="btn-fs">⛶ Layar Penuh</button></div>
+        <div id="menu-best" class="best"></div>
+        <div class="controls kbd-only">
+          <span><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> Jalan</span>
+          <span><kbd>Shift</kbd> Lari</span>
+          <span><kbd>Space</kbd> / <kbd>↑</kbd> / <kbd>W</kbd> Lompat</span>
+          <span><kbd>1</kbd>–<kbd>4</kbd> Jawab · <kbd>H</kbd> Hint</span>
+          <span><kbd>P</kbd> Jeda · <kbd>M</kbd> Suara</span>
+        </div>
+        <div class="controls touch-only">
+          <span>◀ ▶ Jalan</span>
+          <span>▲ Lompat (tahan = lebih tinggi)</span>
+          <span>LARI Berlari lebih cepat</span>
+          <span>Ketuk pilihan untuk menjawab soal</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ JEDA ============ -->
+  <section class="overlay" id="pause">
+    <div class="panel small">
+      <h2>⏸ JEDA</h2>
+      <div class="row">
+        <button class="btn" id="btn-resume">▶ Lanjut</button>
+        <button class="btn alt" id="btn-pause-menu">Menu Utama</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ KUIS ============ -->
+  <section class="overlay" id="quiz">
+    <div class="panel quiz">
+      <div class="qhead"><span id="q-cat" class="badge">HTML</span><span class="qbonus" id="q-bonus"></span></div>
+      <h2 id="q-text"></h2>
+      <div id="q-opts"></div>
+      <div id="q-hint" class="hintbox" hidden></div>
+      <div id="q-feedback" class="feedback" hidden></div>
+      <div class="qfoot">
+        <button class="btn hint" id="btn-hint">💡 Hint &amp; Materi Lanjutan <span class="cost" id="hint-cost"></span></button>
+        <button class="btn" id="btn-q-next" hidden>Lanjut ⏎</button>
+      </div>
+      <p class="tip">Tukar poin untuk mendapatkan hint atau materi tambahan!<span class="kbd-only"> (tekan <kbd>H</kbd>) · Jawab dengan klik atau tombol <kbd>1</kbd>–<kbd>4</kbd></span></p>
+    </div>
+  </section>
+
+  <!-- ============ LEVEL SELESAI ============ -->
+  <section class="overlay" id="levelclear">
+    <div class="panel small">
+      <h2 id="lc-title">Level Selesai!</h2>
+      <table class="stats" id="lc-stats"></table>
+      <div class="row"><button class="btn" id="btn-next">Lanjut ⏎</button></div>
+    </div>
+  </section>
+
+  <!-- ============ GAME OVER / TAMAT ============ -->
+  <section class="overlay" id="gameover">
+    <div class="panel">
+      <h2 id="go-title">GAME OVER</h2>
+      <p id="go-msg"></p>
+      <div class="bigscore"><small>Skor Akhir</small><b id="go-score">0</b></div>
+      <p id="go-rank" class="rank"></p>
+      <table class="board" id="go-board"></table>
+      <div class="row">
+        <button class="btn" id="btn-again">↻ Play Again</button>
+        <button class="btn alt" id="btn-go-board">🏆 Dashboard</button>
+        <button class="btn alt" id="btn-go-menu">Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD SKOR ============ -->
+  <section class="overlay" id="dashboard">
+    <div class="panel">
+      <h2>🏆 Dashboard Skor Tertinggi</h2>
+      <div class="summary" id="db-summary"></div>
+      <table class="board" id="db-board"></table>
+      <div class="row">
+        <button class="btn alt" id="btn-db-back">← Kembali</button>
+        <button class="btn danger" id="btn-db-clear">Hapus Data</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- permintaan memutar layar (hanya HP portrait) -->
+<div id="rotate">
+  <div class="phone">📱</div>
+  <h2>Putar layar ke mode landscape</h2>
+  <p>Game ini dimainkan secara mendatar agar tampilannya penuh.</p>
+  <button id="rotate-stay">Tetap main di portrait</button>
+</div>
+
+<!-- core -->
+<script>
+/* js/core/config.js */
+/* ============================================================
+   config.js — konstanta global & pengaturan gameplay
+   ============================================================ */
+const TILE = 40;            // ukuran satu tile (px)
+const VIEW_W = 960;         // lebar area pandang (satuan dunia game)
+const VIEW_H = 540;         // tinggi area pandang (satuan dunia game)
+const WORLD_H = 560;        // tinggi dunia = 14 baris tile
+const CAM_Y = WORLD_H - VIEW_H;   // 20px bagian atas langit tidak ditampilkan
+const RENDER_SCALE = 2;     // 960x540 x 2 = 1920x1080 piksel (resolusi canvas sebenarnya)
+const RENDER_W = VIEW_W * RENDER_SCALE;   // 1920
+const RENDER_H = VIEW_H * RENDER_SCALE;   // 1080
+const GRAVITY = 2200;       // px/s^2
+const MAX_FALL = 1000;      // kecepatan jatuh maksimum px/s
+const STEP = 1 / 60;        // langkah fisika tetap
+
+const CFG = {
+  // gerak pemain
+  walkSpeed: 220,
+  runSpeed: 340,
+  accelGround: 1900,
+  accelAir: 1200,
+  friction: 1800,
+  jumpVel: -880,            // tinggi lompat ~ 176px (4.4 tile)
+  jumpCut: 0.45,            // lompat pendek jika tombol dilepas lebih awal
+  coyote: 0.10,             // toleransi lompat sesaat setelah meninggalkan tanah
+  buffer: 0.12,             // toleransi tombol lompat ditekan sedikit sebelum mendarat
+  invincible: 2.0,          // detik kebal setelah terkena damage
+
+  // sistem game
+  lives: 3,
+  coinPoints: 10,
+  stompPoints: 100,
+  questionBonus: 300,       // bonus jawaban benar
+  answerPoints: 50,         // poin partisipasi jika salah
+  hintCost: 200,            // harga hint / materi lanjutan
+  timeBonusPerSec: 5,
+  levelBonus: 500,
+  lifeBonus: 200            // bonus per nyawa tersisa saat tamat
+};
+
+// kategori soal (ikon seperti gelembung soal di gambar referensi)
+const CAT = {
+  HTML: { name: 'HTML',       color: '#e44d26', fg: '#ffffff', mark: '5'  },
+  CSS:  { name: 'CSS',        color: '#2965f1', fg: '#ffffff', mark: '3'  },
+  JS:   { name: 'JavaScript', color: '#f7df1e', fg: '#222222', mark: 'JS' }
+};
+
+</script>
+<script>
+/* js/core/utils.js */
+/* ============================================================
+   utils.js — fungsi bantu umum
+   ============================================================ */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/** Tabrakan AABB antara dua objek {x,y,w,h} */
+const overlap = (a, b) =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+/** Acak array (Fisher–Yates), mengembalikan array baru */
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** 83 -> "01:23" */
+function fmtTime(s) {
+  s = Math.max(0, Math.ceil(s));
+  const m = Math.floor(s / 60), ss = s % 60;
+  return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+}
+
+/** Pseudo-random dengan seed (deterministik) */
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+}
+
+/** Persegi panjang bersudut membulat */
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** Pecah teks menjadi beberapa baris sesuai lebar maksimum */
+function wrapText(ctx, text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; }
+    else line = t;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+</script>
+<script>
+/* js/core/input.js */
+/* ============================================================
+   input.js — penanganan keyboard
+   Kontrol: ← → / A D (jalan), Shift/X (lari),
+            Space / ↑ / W / Z (lompat), P / Esc (jeda), M (suara)
+   Layar sentuh: tombol virtual memakai vPress()/vRelease() (lihat touch.js)
+   ============================================================ */
+class Input {
+  constructor() {
+    this.down = new Set();
+    this.pressed = new Set();
+    this.vdown = new Set();          // tombol virtual (layar sentuh)
+
+    const isTyping = e => e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+
+    window.addEventListener('keydown', e => {
+      if (isTyping(e)) return;                       // jangan ganggu pengetikan nama
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+      if (!e.repeat) this.pressed.add(e.code);
+      this.down.add(e.code);
+    });
+    window.addEventListener('keyup', e => this.down.delete(e.code));
+    window.addEventListener('blur', () => this.down.clear());
+  }
+
+  isDown(...codes) { return codes.some(c => this.down.has(c) || this.vdown.has(c)); }
+
+  /** Tombol virtual dari layar sentuh */
+  vPress(code) { if (!this.vdown.has(code)) this.pressed.add(code); this.vdown.add(code); }
+  vRelease(code) { this.vdown.delete(code); }
+  vClear() { this.vdown.clear(); }
+  wasPressed(...codes) { return codes.some(c => this.pressed.has(c)); }
+  endFrame() { this.pressed.clear(); }
+
+  get left()  { return this.isDown('ArrowLeft', 'KeyA'); }
+  get right() { return this.isDown('ArrowRight', 'KeyD'); }
+  get run()   { return this.isDown('ShiftLeft', 'ShiftRight', 'KeyX'); }
+  get jumpDown()    { return this.isDown('Space', 'ArrowUp', 'KeyW', 'KeyZ'); }
+  get jumpPressed() { return this.wasPressed('Space', 'ArrowUp', 'KeyW', 'KeyZ'); }
+}
+
+</script>
+<script>
+/* js/core/audio.js */
+/* ============================================================
+   audio.js — efek suara sederhana (WebAudio, tanpa file eksternal)
+   ============================================================ */
+class Sound {
+  constructor() { this.ctx = null; this.muted = false; }
+
+  /** Harus dipanggil dari gestur pengguna (klik / tombol) */
+  init() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  }
+
+  tone(freq, dur, type = 'square', vol = 0.07, slide = 0, delay = 0) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.ctx.destination);
+    o.start(t);
+    o.stop(t + dur + 0.02);
+  }
+
+  seq(freqs, dur, gap, type = 'square', vol = 0.07) {
+    freqs.forEach((f, i) => this.tone(f, dur, type, vol, 0, i * gap));
+  }
+
+  play(name) {
+    switch (name) {
+      case 'jump':    this.tone(280, 0.16, 'square', 0.06, 420); break;
+      case 'coin':    this.tone(988, 0.08, 'square', 0.06); this.tone(1319, 0.18, 'square', 0.06, 0, 0.07); break;
+      case 'stomp':   this.tone(220, 0.12, 'square', 0.08, -140); this.tone(130, 0.1, 'triangle', 0.08, 0, 0.06); break;
+      case 'hurt':    this.tone(420, 0.35, 'sawtooth', 0.08, -320); break;
+      case 'qcoin':   this.seq([660, 880, 1100], 0.1, 0.08); break;
+      case 'correct': this.seq([523, 659, 784, 1047], 0.14, 0.1); break;
+      case 'wrong':   this.tone(220, 0.25, 'sawtooth', 0.07, -90); this.tone(160, 0.35, 'sawtooth', 0.07, -60, 0.2); break;
+      case 'hint':    this.seq([740, 988], 0.1, 0.08, 'triangle'); break;
+      case 'win':     this.seq([523, 659, 784, 1047, 1319], 0.2, 0.12); break;
+      case 'over':    this.seq([392, 330, 262, 196], 0.3, 0.25, 'triangle', 0.09); break;
+      case 'respawn': this.seq([392, 523], 0.1, 0.08, 'triangle'); break;
+    }
+  }
+}
+
+</script>
+<script>
+/* js/core/storage.js */
+/* ============================================================
+   storage.js — penyimpanan skor tertinggi (localStorage)
+   ============================================================ */
+const Store = (() => {
+  const KEY = 'codeRunner.scores.v1';
+  const NAME = 'codeRunner.name.v1';
+  let mem = [];            // cadangan jika localStorage tidak tersedia
+  let memName = '';
+
+  const read = () => {
+    try {
+      const v = JSON.parse(localStorage.getItem(KEY));
+      return Array.isArray(v) ? v : [];
+    } catch (e) { return mem; }
+  };
+  const write = list => {
+    mem = list;
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* abaikan */ }
+  };
+
+  return {
+    scores: read,
+    best() { const l = read(); return l.length ? l[0].score : 0; },
+
+    /** Menambah skor; mengembalikan peringkat (0 = terbaik) atau -1 jika di luar 10 besar */
+    add(entry) {
+      const l = read();
+      l.push(entry);
+      l.sort((a, b) => b.score - a.score);
+      const idx = l.indexOf(entry);
+      write(l.slice(0, 10));
+      return idx < 10 ? idx : -1;
+    },
+    clear() { write([]); },
+
+    getName() { try { return localStorage.getItem(NAME) || ''; } catch (e) { return memName; } },
+    setName(n) { memName = n; try { localStorage.setItem(NAME, n); } catch (e) { /* abaikan */ } }
+  };
+})();
+
+</script>
+<!-- grafis -->
+<script>
+/* js/gfx/sprites.js */
+/* ============================================================
+   sprites.js — semua grafis pixel-art dibuat lewat kode
+   (sprite karakter, musuh, tile, latar kota berlapis/parallax)
+   ============================================================ */
+const THEMES = {
+  day:     { skyTop: '#3f9cf0', skyBot: '#c4e9ff', sun: '#fff3a0', far: '#7fa6c9', farWin: '#e3f2ff', winAlpha: 0.5,  mid: '#3f9a52', midLt: '#58b86a', cloud: '#ffffff' },
+  sunset:  { skyTop: '#ff8a5c', skyBot: '#ffd9a0', sun: '#fff0b0', far: '#b5738a', farWin: '#ffe3a8', winAlpha: 0.5,  mid: '#3b7a4a', midLt: '#51985f', cloud: '#ffe9d6' },
+  evening: { skyTop: '#3a2f6b', skyBot: '#e07a8a', sun: '#ffd9a0', far: '#4b3f7a', farWin: '#ffd77a', winAlpha: 0.6,  mid: '#2c5a46', midLt: '#3a7258', cloud: '#f5c6d6' },
+  night:   { skyTop: '#0b1030', skyBot: '#2b3a7a', sun: '#f2f2d0', far: '#1c2550', farWin: '#ffe27a', winAlpha: 0.75, mid: '#143a35', midLt: '#1d4d46', cloud: '#4a5a9a', stars: true },
+  dawn:    { skyTop: '#6a7bd6', skyBot: '#ffc7a8', sun: '#fff1c0', far: '#6a6aa8', farWin: '#fff0b8', winAlpha: 0.55, mid: '#3a8a5e', midLt: '#52a874', cloud: '#fff0e6' }
+};
+
+const Sprites = (() => {
+  const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+  /** Ubah peta karakter (string) + palet menjadi canvas bergambar pixel */
+  const make = (map, pal, s = 3) => {
+    const c = cv(map[0].length * s, map.length * s);
+    const g = c.getContext('2d');
+    map.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const k = row[x];
+        if (k !== '.' && pal[k]) { g.fillStyle = pal[k]; g.fillRect(x * s, y * s, s, s); }
+      }
+    });
+    return c;
+  };
+
+  /* ---------- Raka (12x16) ---------- */
+  const PLAYER_PAL = { h: '#3a2a22', s: '#f4c79b', e: '#1b1b1b', p: '#2f4aa8', w: '#f5f5f5', r: '#d63a3a', b: '#2f62d6', k: '#262626' };
+  const PLAYER_TOP = [
+    '...hhhhh....',
+    '..hhhhhhh...',
+    '..hhsssshh..',
+    '..hssessss..',
+    '..hsssssss..',
+    '...ssssss...',
+    '..pwwrrww...',
+    '.pppwwrwws..',
+    '.ppswwrwwss.',
+    '.ppsswwwwss.',
+    '..p.wwwww...'
+  ];
+  const PLAYER_LEGS = {
+    idle:  ['....bbbbb...', '....bbbbb...', '....bb.bb...', '....ss.ss...', '...kkk.kkk..'],
+    stride:['...bbbbbb...', '..bbb..bbb..', '.bbb....bb..', '.ss......ss.', 'kkk.....kkk.'],
+    cross: ['....bbbbb...', '....bbbbb...', '.....bbb....', '.....sss....', '....kkkk....'],
+    jump:  ['...bbbbbb...', '..bbbbbbbb..', '..bb....bb..', '..ss....sss.', '..kk....kkk.']
+  };
+
+  /* ---------- Musuh berduri ungu (12x12) ---------- */
+  const SPIKY_PAL = { p: '#5a3fc0', d: '#2a1a70', w: '#ffffff', k: '#111111', f: '#2a1a70' };
+  const SPIKY_BODY = [
+    '..p..pp..p..',
+    '.pp.pppp.pp.',
+    '.pppppppppp.',
+    'pppppppppppp',
+    'ppwwpppwwppp',
+    'ppwkpppkwppp',
+    'pppppppppppp',
+    'pppppddpppp.',
+    '.pppddddppp.',
+    '.pppppppppp.',
+    '..pppppppp..'
+  ];
+  const SPIKY_FEET = ['..ff....ff..', '.ff......ff.'];
+
+  /* ---------- Musuh topi merah (12x12) ---------- */
+  const WALKER_PAL = { c: '#b3261b', r: '#e74c3c', w: '#ffffff', k: '#111111', d: '#7a1a1a', f: '#5a1a1a' };
+  const WALKER_BODY = [
+    '...cccccc...',
+    '..cccccccc..',
+    '.cccccccccc.',
+    '..rrrrrrrr..',
+    '.rrwwrrwwrr.',
+    '.rrwkrrkwrr.',
+    '.rrrrrrrrrr.',
+    '.rrrdddrrrr.',
+    '..rrrrrrrr..',
+    '..rrrrrrrr..'
+  ];
+  const WALKER_FEET = [['..ff....ff..', '.fff....fff.'], ['...ff..ff...', '..fff..fff..']];
+
+  const S = {
+    make,
+    player: {}, playerWalk: [],
+    spiky: [], walker: [],
+    tiles: {}, spike: null,
+
+    /** Gambar canvas, dibalik horizontal bila flip = true */
+    drawFlip(ctx, img, x, y, flip) {
+      if (flip) {
+        ctx.save();
+        ctx.translate(x + img.width, y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, 0);
+        ctx.restore();
+      } else ctx.drawImage(img, x, y);
+    },
+
+    heartURL(full) {
+      const map = ['.rrr.rrr.', 'rwwrrrrrr', 'rrrrrrrrr', 'rrrrrrrrr', '.rrrrrrr.', '..rrrrr..', '...rrr...', '....r....'];
+      return make(map, { r: full ? '#e8283c' : '#3a3a4a', w: full ? '#ff9aa8' : '#4c4c5e' }, 3).toDataURL();
+    },
+
+    init() {
+      // karakter
+      for (const k in PLAYER_LEGS) S.player[k] = make(PLAYER_TOP.concat(PLAYER_LEGS[k]), PLAYER_PAL, 3);
+      S.playerWalk = [S.player.stride, S.player.cross, S.player.idle, S.player.cross];
+      // musuh
+      S.spiky = SPIKY_FEET.map(f => make(SPIKY_BODY.concat([f]), SPIKY_PAL, 3));
+      S.walker = WALKER_FEET.map(f => make(WALKER_BODY.concat(f), WALKER_PAL, 3));
+
+      // tile 40x40
+      const tile = fn => { const c = cv(TILE, TILE); fn(c.getContext('2d')); return c; };
+      const dirt = g => {
+        const r = rng(7);
+        const cols = ['#8d5230', '#7f4727', '#9a5c36', '#74401f'];
+        for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) {
+          g.fillStyle = cols[Math.floor(r() * cols.length)];
+          g.fillRect(x * 4, y * 4, 4, 4);
+        }
+        g.fillStyle = '#5e3318';
+        for (let i = 0; i < 4; i++) g.fillRect(Math.floor(r() * 9) * 4, Math.floor(r() * 9) * 4, 8, 4);
+      };
+      S.tiles.D = tile(dirt);
+      S.tiles.G = tile(g => {
+        dirt(g);
+        g.fillStyle = '#4caf2a'; g.fillRect(0, 0, 40, 10);
+        for (let x = 0; x < 10; x++) { g.fillStyle = '#4caf2a'; g.fillRect(x * 4, 10, 4, 2 + ((x * 7) % 3) * 2); }
+        g.fillStyle = '#2f7d1e';
+        for (let x = 0; x < 10; x += 2) g.fillRect(x * 4, 8, 4, 2);
+        g.fillStyle = '#8be04e'; g.fillRect(0, 0, 40, 4);
+        g.fillStyle = '#b6f07a'; for (let x = 1; x < 10; x += 3) g.fillRect(x * 4, 0, 4, 2);
+      });
+      S.tiles.B = tile(g => {
+        g.fillStyle = '#c9622a'; g.fillRect(0, 0, 40, 40);
+        for (let row = 0; row < 4; row++) {
+          const y = row * 10, off = (row % 2) * 10;
+          g.fillStyle = '#e8935a';
+          for (let x = off - 20; x < 40; x += 20) g.fillRect(Math.max(0, x + 2), y + 1, 16, 2);
+          g.fillStyle = '#6e2f0f';
+          g.fillRect(0, y + 8, 40, 2);
+          for (let x = off; x < 40; x += 20) g.fillRect(x, y, 2, 10);
+        }
+      });
+
+      // duri 40x22
+      const sp = cv(40, 22), g = sp.getContext('2d');
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle = '#d7dde3';
+        g.beginPath(); g.moveTo(i * 10 + 5, 0); g.lineTo(i * 10, 22); g.lineTo(i * 10 + 10, 22); g.closePath(); g.fill();
+        g.fillStyle = '#8a95a0';
+        g.beginPath(); g.moveTo(i * 10 + 5, 0); g.lineTo(i * 10 + 10, 22); g.lineTo(i * 10 + 5, 22); g.closePath(); g.fill();
+      }
+      S.spike = sp;
+    },
+
+    /** Latar kota berlapis: langit, awan, gedung jauh, pepohonan */
+    makeBackground(th, seed) {
+      const r = rng(seed * 7919 + 13);
+
+      const sky = cv(VIEW_W, WORLD_H), g = sky.getContext('2d');
+      const gr = g.createLinearGradient(0, 0, 0, WORLD_H * 0.8);
+      gr.addColorStop(0, th.skyTop); gr.addColorStop(1, th.skyBot);
+      g.fillStyle = gr; g.fillRect(0, 0, VIEW_W, WORLD_H);
+      if (th.stars) {
+        g.fillStyle = '#fff';
+        for (let i = 0; i < 90; i++) { g.globalAlpha = 0.4 + r() * 0.6; g.fillRect(r() * VIEW_W, r() * WORLD_H * 0.6, 2, 2); }
+        g.globalAlpha = 1;
+      }
+      const sx = VIEW_W - 170, sy = 100;
+      const rg = g.createRadialGradient(sx, sy, 10, sx, sy, 90);
+      rg.addColorStop(0, th.sun); rg.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = rg; g.fillRect(sx - 100, sy - 100, 200, 200);
+      g.fillStyle = th.sun; g.beginPath(); g.arc(sx, sy, 30, 0, Math.PI * 2); g.fill();
+
+      // awan
+      const clouds = cv(1600, 240), c = clouds.getContext('2d');
+      const ell = (x, y, rx, ry) => { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); };
+      for (let i = 0; i < 7; i++) {
+        const x = 80 + i * 220 + r() * 60, y = 40 + r() * 130, s = 0.8 + r() * 0.8;
+        c.fillStyle = 'rgba(120,150,200,0.25)'; ell(x + 5, y + 14 * s, 55 * s, 8 * s);
+        c.fillStyle = th.cloud;
+        ell(x, y, 60 * s, 22 * s); ell(x + 40 * s, y - 14 * s, 40 * s, 26 * s); ell(x - 35 * s, y - 6 * s, 35 * s, 18 * s);
+      }
+
+      // gedung jauh
+      const far = cv(1280, 420), f = far.getContext('2d');
+      let x = 0;
+      while (x < 1280) {
+        const bw = 50 + Math.floor(r() * 60), bh = 180 + Math.floor(r() * 220), y = 420 - bh;
+        f.fillStyle = th.far; f.fillRect(x, y, bw, bh);
+        f.fillStyle = 'rgba(255,255,255,0.08)'; f.fillRect(x, y, 4, bh);
+        if (r() < 0.35) { f.fillStyle = th.far; f.fillRect(x + bw / 2 - 2, y - 14, 4, 14); }
+        f.fillStyle = th.farWin;
+        for (let wy = y + 10; wy < 412; wy += 14) for (let wx = x + 8; wx < x + bw - 8; wx += 12) {
+          if (r() < 0.55) { f.globalAlpha = th.winAlpha; f.fillRect(wx, wy, 6, 8); }
+        }
+        f.globalAlpha = 1;
+        x += bw + Math.floor(r() * 8);
+      }
+
+      // pepohonan
+      const mid = cv(1000, 240), m = mid.getContext('2d');
+      const circ = (cx, cy, rad) => { m.beginPath(); m.arc(cx, cy, rad, 0, Math.PI * 2); m.fill(); };
+      for (let tx = 20; tx < 1000; tx += 40 + Math.floor(r() * 50)) {
+        const h = 70 + r() * 70, w = 36 + r() * 30;
+        m.fillStyle = '#4a3320'; m.fillRect(tx + w / 2 - 4, 240 - h * 0.45, 8, h * 0.45);
+        m.fillStyle = th.mid; circ(tx + w / 2, 240 - h * 0.65, w * 0.55); circ(tx + w * 0.2, 240 - h * 0.5, w * 0.35); circ(tx + w * 0.8, 240 - h * 0.5, w * 0.35);
+        m.fillStyle = th.midLt; circ(tx + w * 0.4, 240 - h * 0.78, w * 0.28);
+      }
+
+      return { sky, clouds, far, mid };
+    }
+  };
+  return S;
+})();
+
+</script>
+<!-- entitas -->
+<script>
+/* js/entities/entity.js */
+/* ============================================================
+   entity.js — kelas dasar semua objek game (reusable)
+   Fisika: gerak per-sumbu + resolusi tabrakan terhadap grid tile
+   ============================================================ */
+class Entity {
+  constructor(x, y, w, h) {
+    this.x = x; this.y = y; this.w = w; this.h = h;
+    this.vx = 0; this.vy = 0;
+    this.onGround = false;
+    this.hitWall = 0;        // -1 kiri, 1 kanan, 0 tidak
+    this.hitCeil = false;
+    this.dead = false;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+
+  /** Gerakkan entitas dan selesaikan tabrakan dengan tile padat */
+  moveAndCollide(level, dt) {
+    const T = TILE;
+    this.onGround = false; this.hitWall = 0; this.hitCeil = false;
+
+    // --- sumbu X ---
+    this.x += this.vx * dt;
+    const top = Math.floor(this.y / T), bot = Math.floor((this.y + this.h - 0.01) / T);
+    if (this.vx > 0) {
+      const col = Math.floor((this.x + this.w) / T);
+      for (let r = top; r <= bot; r++) {
+        if (level.solid(col, r)) { this.x = col * T - this.w; this.vx = 0; this.hitWall = 1; break; }
+      }
+    } else if (this.vx < 0) {
+      const col = Math.floor(this.x / T);
+      for (let r = top; r <= bot; r++) {
+        if (level.solid(col, r)) { this.x = (col + 1) * T; this.vx = 0; this.hitWall = -1; break; }
+      }
+    }
+
+    // --- sumbu Y ---
+    this.y += this.vy * dt;
+    const left = Math.floor(this.x / T), right = Math.floor((this.x + this.w - 0.01) / T);
+    if (this.vy > 0) {
+      const row = Math.floor((this.y + this.h) / T);
+      for (let c = left; c <= right; c++) {
+        if (level.solid(c, row)) { this.y = row * T - this.h; this.vy = 0; this.onGround = true; break; }
+      }
+    } else if (this.vy < 0) {
+      const row = Math.floor(this.y / T);
+      for (let c = left; c <= right; c++) {
+        if (level.solid(c, row)) { this.y = (row + 1) * T; this.vy = 0; this.hitCeil = true; break; }
+      }
+    }
+  }
+
+  update(dt, game) {}
+  draw(ctx, game) {}
+}
+
+</script>
+<script>
+/* js/entities/player.js */
+/* ============================================================
+   player.js — karakter pemain: jalan, lari, lompat (gravitasi, coyote time,
+   jump buffer, variable jump height), kebal sementara
+   ============================================================ */
+class Player extends Entity {
+  constructor(x, y) {
+    super(x, y, 26, 44);
+    this.facing = 1;
+    this.coyote = 0;
+    this.buffer = 0;
+    this.invincible = 0;
+    this.knock = 0;
+    this.jumping = false;
+    this.anim = 0;
+    this.dust = 0;
+    this.safe = { x, y };      // posisi aman terakhir untuk respawn
+  }
+
+  respawn(pos) {
+    this.x = pos.x; this.y = pos.y;
+    this.vx = 0; this.vy = 0;
+    this.knock = 0;
+    this.invincible = CFG.invincible;
+  }
+
+  update(dt, game) {
+    const inp = game.input, lvl = game.level;
+    const dir = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    const maxSpeed = inp.run ? CFG.runSpeed : CFG.walkSpeed;
+    const accel = this.onGround ? CFG.accelGround : CFG.accelAir;
+
+    if (this.knock > 0) {
+      this.knock -= dt;
+    } else if (dir !== 0) {
+      this.facing = dir;
+      let a = accel;
+      if (Math.sign(this.vx) === -dir) a *= 2;            // belok lebih responsif
+      this.vx += dir * a * dt;
+      if (Math.abs(this.vx) > maxSpeed) {                  // perlambat halus ke batas
+        this.vx -= Math.sign(this.vx) * Math.min(Math.abs(this.vx) - maxSpeed, CFG.friction * dt);
+      }
+    } else if (this.onGround) {
+      const f = CFG.friction * dt;
+      this.vx = Math.abs(this.vx) <= f ? 0 : this.vx - Math.sign(this.vx) * f;
+    }
+
+    // lompat: coyote time + jump buffer
+    this.coyote = this.onGround ? CFG.coyote : this.coyote - dt;
+    this.buffer = inp.jumpPressed ? CFG.buffer : this.buffer - dt;
+    if (this.buffer > 0 && this.coyote > 0) {
+      this.vy = CFG.jumpVel - Math.abs(this.vx) * 0.05;
+      this.buffer = 0; this.coyote = 0; this.onGround = false;
+      this.jumping = true;
+      game.sound.play('jump');
+    }
+    // lepas tombol lebih awal -> lompatan lebih pendek
+    if (this.jumping && !inp.jumpDown && this.vy < 0) { this.vy *= CFG.jumpCut; this.jumping = false; }
+    if (this.vy >= 0) this.jumping = false;
+
+    this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
+
+    const prevVy = this.vy, wasAir = !this.onGround;
+    this.moveAndCollide(lvl, dt);
+
+    // efek debu saat mendarat / berlari
+    if (this.onGround && wasAir && prevVy > 450) game.burst(this.cx, this.y + this.h, '#e8e8e8', 6);
+    if (this.onGround && Math.abs(this.vx) > CFG.walkSpeed + 20) {
+      this.dust -= dt;
+      if (this.dust <= 0) { game.burst(this.cx - this.facing * 10, this.y + this.h, '#ffffff', 1); this.dust = 0.09; }
+    }
+
+    // animasi
+    this.anim += Math.abs(this.vx) * dt * 0.03;
+    if (this.invincible > 0) this.invincible -= dt;
+
+    // simpan posisi aman (tanah padat di kedua sisi, jauh dari duri)
+    if (this.onGround && this.knock <= 0) {
+      const T = TILE, row = Math.floor((this.y + this.h + 1) / T);
+      const cl = Math.floor(this.x / T) - 1, cr = Math.floor((this.x + this.w) / T) + 1;
+      const nearSpike = lvl.spikes.some(s => Math.abs(s.x + 20 - this.cx) < 100);
+      if (lvl.solid(cl, row) && lvl.solid(cr, row) && !nearSpike) this.safe = { x: this.x, y: this.y };
+    }
+  }
+
+  /** Label nama pemain di atas kepala karakter */
+  drawNameTag(ctx, name) {
+    if (!name) return;
+    ctx.save();
+    ctx.font = 'bold 11px Arial, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = Math.ceil(ctx.measureText(name).width) + 12, h = 16;
+    const x = Math.round(this.cx - w / 2), y = Math.round(this.y + this.h - 48 - h - 2);
+    rrect(ctx, x, y, w, h, 6);
+    ctx.fillStyle = 'rgba(10, 25, 60, .78)'; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#6fb0ff'; ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(name, x + w / 2, y + h / 2 + 0.5);
+    ctx.restore();
+  }
+
+  draw(ctx, game) {
+    if (game) this.drawNameTag(ctx, game.playerName);
+    if (this.invincible > 0 && Math.floor(this.invincible * 14) % 2 === 0) return;  // berkedip
+    let frame;
+    if (!this.onGround) frame = Sprites.player.jump;
+    else if (Math.abs(this.vx) > 15) frame = Sprites.playerWalk[Math.floor(this.anim) % 4];
+    else frame = Sprites.player.idle;
+    const dx = Math.round(this.x + this.w / 2 - 18), dy = Math.round(this.y + this.h - 48);
+    Sprites.drawFlip(ctx, frame, dx, dy, this.facing < 0);
+  }
+}
+
+</script>
+<script>
+/* js/entities/enemy.js */
+/* ============================================================
+   enemy.js — musuh dengan AI sederhana
+   - 'spiky'  : patroli bolak-balik (tidak bisa diinjak)
+   - 'walker' : patroli; mengejar pemain jika dekat (bisa diinjak)
+   Keduanya berbalik arah di tepi jurang & saat menabrak dinding.
+   ============================================================ */
+class Enemy extends Entity {
+  constructor(type, x, y, baseSpeed = 60) {
+    super(x, y, 30, 30);
+    this.type = type;
+    this.dir = Math.random() < 0.5 ? -1 : 1;
+    this.stompable = type === 'walker';
+    this.speed = type === 'walker' ? baseSpeed * 1.15 : baseSpeed;
+    this.state = 'patrol';
+    this.squash = 0;
+    this.t = Math.random() * 2;
+  }
+
+  /** Kotak tabrakan sedikit lebih kecil agar adil */
+  get hit() { return { x: this.x + 3, y: this.y + 4, w: this.w - 6, h: this.h - 4 }; }
+
+  update(dt, game) {
+    if (this.squash > 0) {                       // animasi gepeng setelah diinjak
+      this.squash -= dt;
+      if (this.squash <= 0) this.dead = true;
+      return;
+    }
+    this.t += dt;
+    const p = game.player, lvl = game.level;
+    let speed = this.speed;
+
+    if (this.type === 'walker') {
+      const dx = p.cx - this.cx, dy = p.cy - this.cy;
+      if (Math.abs(dx) < 240 && Math.abs(dy) < 80) {
+        this.state = 'chase';
+        this.dir = dx > 0 ? 1 : -1;
+        speed = this.speed * 1.8;
+      } else this.state = 'patrol';
+    }
+
+    if (this.hitWall !== 0) this.dir = -this.hitWall;           // dinding -> berbalik
+
+    if (this.onGround) {                                         // tepi jurang
+      const ahead = this.dir > 0 ? this.x + this.w + 2 : this.x - 2;
+      const col = Math.floor(ahead / TILE), row = Math.floor((this.y + this.h + 2) / TILE);
+      if (!lvl.solid(col, row)) {
+        if (this.state === 'chase') speed = 0; else this.dir *= -1;
+      }
+    }
+
+    this.vx = this.dir * speed;
+    this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
+    this.moveAndCollide(lvl, dt);
+    if (this.y > lvl.rows * TILE + 100) this.dead = true;
+  }
+
+  draw(ctx) {
+    const frames = this.type === 'spiky' ? Sprites.spiky : Sprites.walker;
+    const img = frames[Math.floor(this.t * 4) % 2];
+    const dx = Math.round(this.x + this.w / 2 - 18), base = this.y + this.h;
+    ctx.save();
+    if (this.squash > 0) {
+      ctx.translate(dx, base);
+      ctx.scale(1, 0.35);
+      ctx.drawImage(img, 0, -36);
+    } else {
+      Sprites.drawFlip(ctx, img, dx, Math.round(base - 36), this.dir > 0);
+      if (this.state === 'chase') {                              // tanda seru saat mengejar
+        ctx.fillStyle = '#ff3b3b';
+        ctx.font = 'bold 16px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('!', this.cx, this.y - 8);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+</script>
+<script>
+/* js/entities/collectibles.js */
+/* ============================================================
+   collectibles.js — koin biasa & koin tanda tanya (soal pemrograman web)
+   ============================================================ */
+class Coin extends Entity {
+  constructor(x, y) {
+    super(x + 8, y + 8, 24, 24);
+    this.ph = Math.random() * 6;
+    this.taken = false;
+  }
+
+  draw(ctx, game) {
+    const t = game.t;
+    const cx = this.x + this.w / 2;
+    const cy = this.y + this.h / 2 + Math.sin(t * 3 + this.ph) * 2;
+    const sx = Math.abs(Math.cos(t * 4 + this.ph));          // efek berputar
+    const w = Math.max(2, 11 * sx);
+    const ell = (rx, ry) => { ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
+    ctx.fillStyle = '#b36b00'; ell(w + 2, 13);
+    ctx.fillStyle = '#f7b500'; ell(w, 11);
+    ctx.fillStyle = '#ffe066'; ell(w * 0.55, 7);
+    if (sx > 0.5) { ctx.fillStyle = '#c98200'; ctx.fillRect(cx - 1, cy - 5, 2, 10); }
+  }
+}
+
+class QuestionCoin extends Entity {
+  constructor(x, y, cat) {
+    super(x + 2, y + 2, 36, 36);
+    this.cat = cat;
+    this.question = null;                // diisi saat level dimuat
+    this.ph = Math.random() * 6;
+  }
+
+  draw(ctx, game) {
+    const bob = Math.sin(game.t * 2.5 + this.ph) * 4;
+    const cx = this.x + 18, cy = this.y + 18 + bob;
+    const circ = (r, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); };
+    circ(21, '#8a5200'); circ(18, '#f4a800'); circ(14, '#ffd23f');
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(cx - 10, cy - 11, 6, 3);
+    ctx.font = 'bold 24px "Press Start 2P", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = '#8a5200'; ctx.strokeText('?', cx, cy + 2);
+    ctx.fillStyle = '#ffffff'; ctx.fillText('?', cx, cy + 2);
+    ctx.textBaseline = 'alphabetic';
+    this.drawBubble(ctx, game, cx, cy);
+  }
+
+  /** Gelembung soal seperti pada gambar referensi (muncul saat pemain dekat) */
+  drawBubble(ctx, game, cx, cy) {
+    const p = game.player;
+    if (!p || !this.question) return;
+    const d = Math.abs(p.cx - cx);
+    if (d > 320) return;
+    const info = CAT[this.cat];
+    ctx.save();
+    ctx.globalAlpha = clamp((320 - d) / 80, 0, 1);
+    ctx.font = 'bold 11px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    const maxW = 150, lh = 14;
+    const lines = wrapText(ctx, this.question.q, maxW);
+    const w = maxW + 20, h = lines.length * lh + 38;
+    let bx = clamp(cx - w / 2, game.camX + 6, game.camX + VIEW_W - w - 6);
+    const by = Math.max(100, cy - 28 - h);
+    rrect(ctx, bx, by, w, h, 8);
+    ctx.fillStyle = '#143064'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#6fb0ff'; ctx.stroke();
+    // ekor gelembung
+    ctx.fillStyle = '#143064';
+    ctx.beginPath(); ctx.moveTo(cx - 7, by + h - 1); ctx.lineTo(cx + 7, by + h - 1); ctx.lineTo(cx, by + h + 9); ctx.closePath(); ctx.fill();
+    // ikon kategori
+    ctx.fillStyle = info.color; ctx.fillRect(bx + 8, by + 8, 22, 22);
+    ctx.fillStyle = info.fg; ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.textAlign = 'center'; ctx.fillText(info.mark, bx + 19, by + 24);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px Arial, sans-serif';
+    ctx.fillText(info.name, bx + 38, by + 24);
+    ctx.font = '11px Arial, sans-serif'; ctx.fillStyle = '#dbe9ff';
+    lines.forEach((ln, i) => ctx.fillText(ln, bx + 10, by + 46 + i * lh));
+    ctx.restore();
+  }
+}
+
+</script>
+<script>
+/* js/entities/hazards.js */
+/* ============================================================
+   hazards.js — jebakan statis (duri)
+   ============================================================ */
+class Spike {
+  /** x,y = pojok kiri-atas tile tempat duri berdiri di atasnya */
+  constructor(x, tileTopY) {
+    this.x = x;
+    this.top = tileTopY;
+    this.hit = { x: x + 8, y: tileTopY - 18, w: 24, h: 18 };
+  }
+  draw(ctx) { ctx.drawImage(Sprites.spike, this.x, this.top - 22); }
+}
+
+</script>
+<script>
+/* js/entities/goal.js */
+/* ============================================================
+   goal.js — garis finish: tiang bendera kotak-kotak + gedung sekolah
+   ============================================================ */
+class Goal {
+  constructor(x, groundY, label) {
+    this.x = x; this.gy = groundY; this.label = label;
+    this.hit = { x: x, y: groundY - 240, w: 100, h: 240 };
+  }
+
+  draw(ctx, game) {
+    const { x, gy } = this, t = game.t;
+
+    // tiang
+    ctx.fillStyle = '#cfd6dd'; ctx.fillRect(x + 12, gy - 220, 6, 220);
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(x + 15, gy - 224, 6, 0, Math.PI * 2); ctx.fill();
+    // bendera kotak-kotak berkibar
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) {
+      ctx.fillStyle = (i + j) % 2 ? '#ffffff' : '#111111';
+      ctx.fillRect(x + 18 + i * 8, gy - 216 + j * 8 + Math.sin(t * 4 + i * 0.7) * 2, 8, 8);
+    }
+
+    // gedung
+    const bx = x + 60, bw = 170, bh = 110, by = gy - bh;
+    ctx.fillStyle = '#f2dc9a'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#d9c27a'; ctx.fillRect(bx, by + bh - 10, bw, 10);
+    ctx.fillStyle = '#d9482b';
+    ctx.beginPath(); ctx.moveTo(bx - 12, by); ctx.lineTo(bx + bw / 2, by - 48); ctx.lineTo(bx + bw + 12, by); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b53a22';
+    ctx.beginPath(); ctx.moveTo(bx + bw / 2, by - 48); ctx.lineTo(bx + bw + 12, by); ctx.lineTo(bx + bw / 2, by); ctx.closePath(); ctx.fill();
+    // jendela
+    ctx.fillStyle = '#9fd0ff';
+    for (const wx of [14, 36, 106, 128]) { ctx.fillRect(bx + wx, by + 52, 20, 24); ctx.fillStyle = '#6aa5d8'; ctx.fillRect(bx + wx + 9, by + 52, 2, 24); ctx.fillStyle = '#9fd0ff'; }
+    // pintu
+    ctx.fillStyle = '#2b4f9a'; ctx.fillRect(bx + bw / 2 - 16, by + 60, 32, bh - 60);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(bx + bw / 2 + 8, by + 86, 3, 3);
+    // papan nama
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(bx + bw / 2 - 56, by + 14, 112, 28);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px "Press Start 2P", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let fs = 16;
+    while (ctx.measureText(this.label).width > 104 && fs > 7) { fs--; ctx.font = `bold ${fs}px "Press Start 2P", monospace`; }
+    ctx.fillText(this.label, bx + bw / 2, by + 29);
+    ctx.textBaseline = 'alphabetic';
+    // jam
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(bx + bw / 2, by - 14, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx + bw / 2, by - 14); ctx.lineTo(bx + bw / 2, by - 20); ctx.moveTo(bx + bw / 2, by - 14); ctx.lineTo(bx + bw / 2 + 5, by - 14); ctx.stroke();
+    // bendera merah putih di atap
+    const fx = bx + bw / 2, fy = by - 48;
+    ctx.fillStyle = '#cfd6dd'; ctx.fillRect(fx - 1, fy - 34, 3, 34);
+    const wave = Math.sin(t * 3) * 2;
+    ctx.fillStyle = '#e53935'; ctx.fillRect(fx + 2, fy - 34 + wave * 0.3, 24, 8);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(fx + 2, fy - 26 + wave * 0.3, 24, 8);
+  }
+}
+
+</script>
+<!-- data & dunia -->
+<script>
+/* js/data/questions.js */
+/* ============================================================
+   questions.js — bank soal dasar pemrograman web
+   Q(kategori, soal, jawabanBenar, salah1, salah2, salah3, hint, penjelasan)
+   Urutan pilihan diacak saat ditampilkan.
+   ============================================================ */
+const Q = (c, q, ok, w1, w2, w3, h, e) => ({ c, q, o: [ok, w1, w2, w3], a: 0, h, e });
+
+const QUESTIONS = [
+  /* ---------------- HTML ---------------- */
+  Q('HTML', 'Apa tag untuk membuat judul utama di HTML?', '<h1>', '<head>', '<title>', '<p>',
+    'Ada enam tingkat judul, h1 sampai h6. Yang terbesar dipakai untuk judul utama.',
+    '<h1> adalah judul utama. <title> hanya mengatur judul pada tab browser.'),
+  Q('HTML', 'Tag mana yang dipakai untuk membuat tautan (link) ke halaman lain?', '<a>', '<link>', '<href>', '<url>',
+    'Tag ini singkatan dari "anchor".',
+    '<a href="..."> membuat hyperlink. <link> dipakai di <head> untuk menghubungkan file seperti CSS.'),
+  Q('HTML', 'Atribut apa yang menyimpan alamat gambar pada tag <img>?', 'src', 'href', 'alt', 'link',
+    'Singkatan dari "source".',
+    'src berisi lokasi file gambar. href dipakai pada tautan <a>.'),
+  Q('HTML', 'Tag untuk membuat daftar berbutir (bullet list) adalah…', '<ul>', '<ol>', '<li>', '<dl>',
+    'Singkatan dari "unordered list".',
+    '<ul> = daftar berbutir, <ol> = daftar bernomor, <li> = satu item daftar.'),
+  Q('HTML', 'Tag <br> berfungsi untuk…', 'Membuat baris baru', 'Membuat teks tebal', 'Membuat garis horizontal', 'Membuat paragraf baru',
+    'Singkatan dari "break".',
+    '<br> memutus baris tanpa membuat paragraf baru, dan tidak memerlukan tag penutup.'),
+  Q('HTML', 'Elemen mana yang dipakai untuk membuat kolom isian teks?', '<input>', '<text>', '<field>', '<textbox>',
+    'Atribut type="text" adalah bawaannya.',
+    '<input type="text"> membuat kolom isian satu baris.'),
+  Q('HTML', 'Deklarasi <!DOCTYPE html> di awal dokumen menandakan…', 'Dokumen ini HTML5', 'Komentar HTML', 'Sebuah tag CSS', 'Skrip JavaScript',
+    'Browser perlu tahu versi HTML yang dipakai.',
+    '<!DOCTYPE html> memberi tahu browser bahwa dokumen memakai standar HTML5.'),
+  Q('HTML', 'Tag mana yang berisi konten yang tampil di halaman web?', '<body>', '<head>', '<meta>', '<title>',
+    'Isinya teks, gambar, tombol, dan semua yang bisa dilihat pengunjung.',
+    '<body> berisi konten terlihat, sedangkan <head> berisi informasi tentang halaman.'),
+  Q('HTML', 'Tag untuk membuat tabel adalah…', '<table>', '<grid>', '<tab>', '<cell>',
+    'Baris tabel memakai <tr>, sel memakai <td>.',
+    '<table> membungkus tabel; <tr> adalah baris, <td> adalah sel, <th> sel judul.'),
+  Q('HTML', 'Apa fungsi atribut alt pada tag <img>?', 'Teks pengganti jika gambar gagal dimuat', 'Mengatur ukuran gambar', 'Mengatur posisi gambar', 'Menambah animasi',
+    'Berguna bagi pembaca layar dan saat koneksi lambat.',
+    'alt menjelaskan isi gambar, penting untuk aksesibilitas dan SEO.'),
+
+  /* ---------------- CSS ---------------- */
+  Q('CSS', 'Properti apa yang digunakan untuk mengubah warna teks?', 'color', 'font-color', 'text-color', 'background-color',
+    'Namanya sangat singkat, hanya satu kata.',
+    'color mengubah warna teks. background-color mengubah warna latar.'),
+  Q('CSS', 'Properti untuk mengubah warna latar belakang elemen?', 'background-color', 'bgcolor', 'color', 'back-color',
+    'Ada kata "background" di dalam namanya.',
+    'background-color mengatur warna latar belakang elemen.'),
+  Q('CSS', 'Selector untuk memilih elemen dengan class "kotak" adalah…', '.kotak', '#kotak', 'kotak', '*kotak',
+    'Class diawali dengan tanda titik.',
+    '.nama memilih class, #nama memilih id, nama saja memilih tag.'),
+  Q('CSS', 'Properti untuk memberi jarak di LUAR border elemen?', 'margin', 'padding', 'spacing', 'outline',
+    'Jarak di dalam border disebut padding.',
+    'margin = jarak luar, padding = jarak antara isi dan border.'),
+  Q('CSS', 'Properti untuk mengubah ukuran huruf?', 'font-size', 'text-size', 'font-style', 'size',
+    'Ukurannya bisa dalam px, em, atau rem.',
+    'font-size mengatur ukuran huruf, contoh: font-size: 16px;'),
+  Q('CSS', 'Nilai display apa yang mengaktifkan tata letak fleksibel (flexbox)?', 'flex', 'block', 'inline', 'table-cell',
+    'Nama modul tata letaknya sama dengan nilainya.',
+    'display: flex menjadikan elemen sebagai flex container.'),
+  Q('CSS', 'Selector "#menu" memilih elemen dengan…', 'id "menu"', 'class "menu"', 'tag <menu> saja', 'atribut name "menu"',
+    'Tanda pagar (#) dipakai untuk atribut yang harus unik.',
+    '# memilih berdasarkan id; id sebaiknya unik dalam satu halaman.'),
+  Q('CSS', 'Properti untuk membuat sudut elemen membulat?', 'border-radius', 'corner', 'round', 'border-curve',
+    'Radius artinya jari-jari lingkaran.',
+    'border-radius: 10px; membulatkan sudut elemen.'),
+  Q('CSS', 'Bagaimana cara menulis komentar di CSS?', '/* komentar */', '// komentar', '<!-- komentar -->', '# komentar',
+    'Mirip komentar blok pada beberapa bahasa pemrograman lain.',
+    'CSS hanya mengenal komentar blok /* ... */. Format <!-- --> milik HTML.'),
+  Q('CSS', 'Properti untuk menengahkan teks secara horizontal (nilai center)?', 'text-align', 'vertical-align', 'line-height', 'text-indent',
+    'Properti ini mengatur perataan kiri, kanan, tengah, atau rata kiri-kanan.',
+    'text-align: center; menengahkan teks di dalam elemennya.'),
+
+  /* ---------------- JavaScript ---------------- */
+  Q('JS', 'Bagaimana cara menampilkan pesan ke pengguna?', "alert('Halo')", "print('Halo')", "msg('Halo')", "echo 'Halo'",
+    'Fungsi ini memunculkan kotak dialog di browser.',
+    'alert() menampilkan kotak pesan. console.log() hanya menulis ke Console developer.'),
+  Q('JS', 'Cara menulis keluaran ke Console browser?', 'console.log()', 'document.print()', 'window.write()', 'log.console()',
+    'Dipakai programmer untuk debugging; buka dengan F12.',
+    'console.log() mencetak nilai ke Console pada developer tools.'),
+  Q('JS', 'Kata kunci untuk mendeklarasikan variabel yang nilainya tidak bisa ditetapkan ulang?', 'const', 'var', 'let', 'static',
+    'Singkatan dari "constant".',
+    'const tidak bisa ditetapkan ulang; let dan var bisa.'),
+  Q('JS', 'Apa hasil dari 5 + "5" di JavaScript?', '"55"', '10', 'Error', 'NaN',
+    'Salah satu operand adalah string.',
+    'Jika salah satu operand string, operator + menggabungkan teks (concatenation).'),
+  Q('JS', 'Operator === berarti…', 'Sama nilai dan sama tipe data', 'Hanya sama nilai', 'Tidak sama', 'Menetapkan nilai',
+    'Disebut juga strict equality.',
+    '=== membandingkan nilai sekaligus tipe. == hanya membandingkan nilai setelah konversi tipe.'),
+  Q('JS', 'Cara yang benar membuat fungsi bernama halo?', 'function halo() {}', 'def halo():', 'func halo {}', 'create halo()',
+    'Kata kunci pembuatnya sama dengan nama konsepnya.',
+    'function halo() { ... } mendeklarasikan fungsi. def adalah milik Python.'),
+  Q('JS', 'Method untuk memilih elemen HTML berdasarkan id?', 'document.getElementById()', 'document.findId()', 'window.selectId()', 'document.id()',
+    'Nama method-nya hampir seperti kalimat: "ambil elemen dengan id".',
+    'document.getElementById("nama") mengembalikan elemen yang cocok.'),
+  Q('JS', 'Struktur data untuk menyimpan daftar nilai berurutan?', 'Array', 'Boolean', 'Number', 'String',
+    'Ditulis dengan tanda kurung siku [ ].',
+    'Array menyimpan banyak nilai berurutan, contoh: [1, 2, 3].'),
+  Q('JS', 'Event apa yang terjadi saat tombol diklik?', 'onclick', 'onhover', 'onload', 'onchange',
+    'Kata "klik" ada dalam namanya.',
+    'onclick (atau addEventListener("click", ...)) dijalankan saat elemen diklik.'),
+  Q('JS', 'Pernyataan yang menjalankan blok kode hanya jika kondisi bernilai true?', 'if', 'for', 'while', 'return',
+    'Artinya "jika" dalam bahasa Inggris.',
+    'if (kondisi) { ... } menjalankan blok hanya saat kondisi true.')
+];
+
+/** Mengambil soal acak per kategori tanpa pengulangan sampai semua soal terpakai */
+class QuestionBank {
+  constructor(all) { this.all = all; this.decks = {}; }
+  next(cat) {
+    let d = this.decks[cat];
+    if (!d || !d.length) d = this.decks[cat] = shuffle(this.all.filter(q => q.c === cat));
+    return d.pop();
+  }
+}
+
+</script>
+<script>
+/* js/data/levels.js */
+/* ============================================================
+   levels.js — data level.
+   Format (semua posisi dalam satuan tile; baris tanah = 11):
+     g:       [[kolomAwal, kolomAkhir, tinggiNaik?], ...]  segmen tanah (celah = jurang)
+     plat:    [[kolom, baris, panjang, 'B'|'G'], ...]       platform melayang
+     coins:   [[kolom, baris, jumlah?], ...]
+     q:       [[kolom, baris, 'HTML'|'CSS'|'JS'], ...]      koin tanda tanya
+     enemies: [['spiky'|'walker', kolom, barisMulaiCari?], ...]
+     spikes:  [[kolom, jumlah], ...]
+   Level 1-3 dirancang manual, level 4-5 dibangkitkan otomatis (generateLevel).
+   ============================================================ */
+
+/** Pembangkit level prosedural dengan seed (deterministik & selalu bisa diselesaikan) */
+function generateLevel(o) {
+  const r = rng(o.seed), cats = ['HTML', 'CSS', 'JS'];
+  const g = [], plat = [], coins = [], q = [], enemies = [], spikes = [];
+
+  g.push([0, 11, 0]);
+  coins.push([3, 10, 3]);
+  let x = 12, h = 0, qn = 0;
+
+  for (let s = 0; s < o.segments; s++) {
+    const gap = r() < 0.25 ? 0 : (r() < 0.5 ? 3 : 4);
+    const nh = clamp(h + [-1, 0, 1, 2][Math.floor(r() * 4)], 0, 2);
+
+    if (gap > 0 && r() < 0.6) plat.push([x + 1, 9 - Math.max(h, nh), 2, 'B']);   // batu pijakan
+    x += gap;
+
+    const L = 11 + Math.floor(r() * 3);                                          // panjang 11..13
+    g.push([x, x + L - 1, nh]);
+
+    if (r() < o.spikeRate) spikes.push([x + 7, 2]);
+    if (r() < o.enemyRate) enemies.push([r() < 0.5 ? 'walker' : 'spiky', x + L - 3]);
+    coins.push([x + 8, 10 - nh, 3]);
+    if (r() < 0.7) {
+      plat.push([x + 3, 8 - nh, 3, 'B']);
+      coins.push([x + 3, 7 - nh, 3]);
+      if (s % 2 === 0) q.push([x + 4, 6 - nh, cats[qn++ % 3]]);
+    }
+    x += L;
+    h = nh;
+  }
+
+  // area finish yang rata
+  x += 3;
+  g.push([x, x + 13, 0]);
+  return {
+    name: o.name, target: o.target, time: o.time, theme: o.theme, seed: o.seed,
+    cols: x + 14, g, plat, coins, q, enemies, spikes,
+    start: 2, goal: x + 4, enemySpeed: o.enemySpeed
+  };
+}
+
+const LEVEL_DEFS = [
+  /* ---------------- LEVEL 1 — Target: SMP BCI ---------------- */
+  {
+    name: 'Level 1', target: 'SMP BCI', time: 240, theme: 'day', seed: 1, cols: 100, enemySpeed: 55,
+    g: [[0, 22], [26, 35], [36, 39, 1], [40, 45], [49, 66], [70, 99]],
+    plat: [[9, 8, 3, 'B'], [15, 7, 3, 'G'], [30, 8, 2, 'B'], [54, 8, 4, 'B'], [60, 7, 3, 'G'], [80, 8, 3, 'B'], [84, 7, 3, 'G']],
+    coins: [[5, 10, 3], [9, 7, 3], [15, 6, 3], [19, 10, 2], [24, 8, 1], [28, 10, 2], [31, 7, 2], [37, 9, 2], [47, 8, 1],
+            [51, 10, 3], [55, 7, 4], [61, 6, 3], [68, 8, 1], [72, 10, 3], [81, 7, 3], [85, 6, 3]],
+    q: [[10, 6, 'HTML'], [33, 6, 'CSS'], [62, 5, 'JS'], [75, 8, 'HTML']],
+    enemies: [['spiky', 18], ['walker', 20], ['spiky', 33], ['walker', 42], ['walker', 52], ['spiky', 64], ['walker', 76], ['spiky', 88]],
+    spikes: [[58, 2], [78, 2]],
+    start: 2, goal: 92,
+    sign: { col: 6, l1: 'Jangan lupa', l2: 'waktu ya!' }
+  },
+
+  /* ---------------- LEVEL 2 — Target: SMA ---------------- */
+  {
+    name: 'Level 2', target: 'SMA', time: 270, theme: 'sunset', seed: 2, cols: 122, enemySpeed: 70,
+    g: [[0, 14], [19, 30], [31, 36, 1], [37, 42, 2], [43, 50], [55, 64], [65, 70, 1], [75, 88], [89, 92, 2], [93, 96], [101, 121]],
+    plat: [[6, 8, 3, 'B'], [12, 7, 3, 'G'], [16, 8, 2, 'B'], [20, 8, 3, 'B'], [24, 7, 3, 'G'], [52, 8, 2, 'B'], [58, 8, 4, 'B'],
+           [72, 8, 2, 'B'], [78, 7, 3, 'G'], [84, 8, 3, 'B'], [98, 8, 2, 'B'], [105, 8, 3, 'B'], [110, 7, 3, 'G']],
+    coins: [[3, 10, 3], [7, 7, 3], [13, 6, 3], [16, 7, 2], [21, 7, 3], [25, 6, 3], [33, 8, 2], [39, 7, 2], [45, 10, 3], [52, 7, 2],
+            [59, 7, 4], [66, 9, 2], [72, 7, 2], [79, 6, 3], [85, 7, 3], [91, 8, 2], [98, 7, 2], [106, 7, 3], [111, 6, 3]],
+    q: [[7, 6, 'HTML'], [25, 5, 'CSS'], [59, 6, 'JS'], [79, 5, 'HTML'], [106, 6, 'JS'], [111, 5, 'CSS']],
+    enemies: [['walker', 9], ['spiky', 29], ['walker', 34], ['spiky', 40], ['walker', 46], ['spiky', 49], ['walker', 57], ['spiky', 62],
+              ['walker', 68], ['spiky', 82], ['walker', 87], ['spiky', 94], ['walker', 104], ['spiky', 108]],
+    spikes: [[27, 2], [63, 2], [76, 2], [102, 2]],
+    start: 2, goal: 114
+  },
+
+  /* ---------------- LEVEL 3 — Target: KULIAH ---------------- */
+  {
+    name: 'Level 3', target: 'KULIAH', time: 300, theme: 'evening', seed: 3, cols: 142, enemySpeed: 85,
+    g: [[0, 12], [17, 26], [27, 30, 1], [31, 34, 2], [35, 40, 3], [41, 48], [53, 60], [61, 64, 1], [69, 80], [81, 84, 2],
+        [85, 90], [95, 104], [105, 108, 1], [109, 112, 2], [117, 141]],
+    plat: [[5, 8, 3, 'B'], [10, 7, 2, 'G'], [14, 8, 2, 'B'], [20, 7, 3, 'G'], [24, 8, 2, 'B'], [45, 8, 3, 'B'], [50, 8, 2, 'B'],
+           [55, 7, 3, 'G'], [66, 8, 2, 'B'], [72, 7, 3, 'G'], [76, 8, 3, 'B'], [88, 8, 2, 'B'], [92, 8, 2, 'B'], [98, 7, 3, 'G'],
+           [114, 8, 2, 'B'], [120, 8, 3, 'B'], [124, 7, 3, 'G'], [128, 8, 3, 'B']],
+    coins: [[3, 10, 3], [6, 7, 3], [10, 6, 2], [14, 7, 2], [21, 6, 3], [25, 7, 2], [28, 9, 2], [32, 8, 2], [37, 7, 3], [43, 10, 3],
+            [46, 7, 3], [50, 7, 2], [56, 6, 3], [62, 9, 2], [66, 7, 2], [73, 6, 3], [77, 7, 3], [83, 8, 2], [87, 10, 3], [92, 7, 2],
+            [99, 6, 3], [106, 9, 2], [110, 8, 2], [114, 7, 2], [121, 7, 3], [125, 6, 3], [129, 7, 3]],
+    q: [[6, 6, 'HTML'], [21, 5, 'CSS'], [56, 5, 'JS'], [73, 5, 'HTML'], [99, 5, 'CSS'], [125, 5, 'JS']],
+    enemies: [['spiky', 9], ['walker', 19], ['spiky', 26], ['walker', 29], ['spiky', 33], ['walker', 38], ['spiky', 42], ['walker', 44],
+              ['spiky', 59], ['walker', 62], ['spiky', 71], ['walker', 79], ['spiky', 82], ['walker', 87], ['spiky', 96], ['walker', 104],
+              ['spiky', 107], ['walker', 111], ['walker', 123], ['spiky', 131]],
+    spikes: [[18, 1], [47, 2], [75, 1], [101, 1], [118, 2]],
+    start: 2, goal: 134
+  },
+
+  /* ---------------- LEVEL 4 & 5 — dibangkitkan otomatis ---------------- */
+  generateLevel({ name: 'Level 4', target: 'KERJA',   time: 330, theme: 'night', seed: 4041, segments: 9,  enemyRate: 0.8, spikeRate: 0.6, enemySpeed: 95 }),
+  generateLevel({ name: 'Level 5', target: 'STARTUP', time: 360, theme: 'dawn',  seed: 5057, segments: 11, enemyRate: 0.9, spikeRate: 0.7, enemySpeed: 105 })
+];
+
+</script>
+<script>
+/* js/world/level.js */
+/* ============================================================
+   level.js — level berbasis tile (grid) dibangun dari data level
+   Legenda tile:  '.' kosong | 'G' tanah berumput | 'D' tanah | 'B' bata
+   ============================================================ */
+class Level {
+  constructor(def, bank) {
+    this.def = def;
+    this.name = def.name;
+    this.target = def.target;
+    this.time = def.time;
+    this.cols = def.cols;
+    this.rows = 14;
+    this.theme = THEMES[def.theme];
+    this.bg = Sprites.makeBackground(this.theme, def.seed || 1);
+    this.tiles = Array.from({ length: this.rows }, () => Array(this.cols).fill('.'));
+    this.build();
+    this.spawn(bank);
+  }
+
+  get width() { return this.cols * TILE; }
+
+  set(c, r, ch) { if (c >= 0 && c < this.cols && r >= 0 && r < this.rows) this.tiles[r][c] = ch; }
+
+  /** Tile (c,r) padat? Sisi kiri/kanan dunia dianggap dinding. */
+  solid(c, r) {
+    if (c < 0 || c >= this.cols) return true;
+    if (r < 0 || r >= this.rows) return false;
+    return this.tiles[r][c] !== '.';
+  }
+
+  /** Baris tile padat pertama pada kolom c, mulai dari baris `from` */
+  surfaceRow(c, from = 0) {
+    for (let r = from; r < this.rows; r++) if (this.tiles[r][c] !== '.') return r;
+    return -1;
+  }
+
+  build() {
+    const GROUND_TOP = 11;
+    for (const [a, b, h = 0] of this.def.g) {
+      for (let c = a; c <= b; c++) {
+        const tr = GROUND_TOP - h;
+        this.set(c, tr, 'G');
+        for (let r = tr + 1; r < this.rows; r++) this.set(c, r, 'D');
+      }
+    }
+    for (const [x, row, len, kind] of this.def.plat) {
+      for (let c = x; c < x + len; c++) {
+        if (kind === 'B') this.set(c, row, 'B');
+        else { this.set(c, row, 'G'); this.set(c, row + 1, 'D'); }
+      }
+    }
+  }
+
+  /** Membuat semua objek game dari data level */
+  spawn(bank) {
+    const d = this.def, spd = d.enemySpeed || 60;
+
+    this.coins = (d.coins || []).flatMap(([c, r, n = 1]) =>
+      Array.from({ length: n }, (_, i) => new Coin((c + i) * TILE, r * TILE)));
+
+    this.qcoins = (d.q || []).map(([c, r, cat]) => {
+      const qc = new QuestionCoin(c * TILE, r * TILE, cat);
+      qc.question = bank.next(cat);
+      return qc;
+    });
+
+    this.enemies = (d.enemies || []).map(([type, c, from = 0]) => {
+      const row = this.surfaceRow(c, from);
+      return new Enemy(type, c * TILE + 5, row * TILE - 30, spd);
+    });
+
+    this.spikes = (d.spikes || []).flatMap(([c, n]) =>
+      Array.from({ length: n }, (_, i) => new Spike((c + i) * TILE, this.surfaceRow(c + i) * TILE)));
+
+    this.goal = new Goal(d.goal * TILE, this.surfaceRow(d.goal) * TILE, d.target);
+
+    const sr = this.surfaceRow(d.start);
+    this.start = { x: d.start * TILE + 7, y: sr * TILE - 44 };
+  }
+
+  /* ---------------- menggambar ---------------- */
+  drawBackground(ctx, camX, t) {
+    const strip = (img, off, y) => {
+      const w = img.width;
+      let x = -(off % w);
+      if (x > 0) x -= w;
+      x = Math.round(x);
+      for (; x < VIEW_W; x += w) ctx.drawImage(img, x, y);
+    };
+    ctx.drawImage(this.bg.sky, 0, 0);
+    strip(this.bg.clouds, camX * 0.08 + t * 8, 20);
+    strip(this.bg.far, camX * 0.25, 140);
+    strip(this.bg.mid, camX * 0.5, 210);
+  }
+
+  drawTiles(ctx, camX, t) {
+    const c0 = Math.max(0, Math.floor(camX / TILE)), c1 = Math.min(this.cols - 1, Math.ceil((camX + VIEW_W) / TILE));
+
+    // air di bawah jurang
+    for (let c = c0; c <= c1; c++) {
+      if (this.tiles[this.rows - 1][c] !== '.') continue;
+      const x = c * TILE;
+      for (let s = 0; s < TILE; s += 8) {
+        const wy = 488 + Math.sin((x + s + t * 60) / 14) * 3;
+        ctx.fillStyle = '#2b8fe0'; ctx.fillRect(x + s, wy, 8, WORLD_H - wy);
+        ctx.fillStyle = '#7fc8ff'; ctx.fillRect(x + s, wy, 8, 3);
+      }
+    }
+
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const ch = this.tiles[r][c];
+        if (ch !== '.') ctx.drawImage(Sprites.tiles[ch], c * TILE, r * TILE);
+      }
+    }
+    this.drawSign(ctx);
+  }
+
+  /** Papan petunjuk (dekorasi) */
+  drawSign(ctx) {
+    const s = this.def.sign;
+    if (!s) return;
+    const gy = this.surfaceRow(s.col) * TILE, x = s.col * TILE;
+    ctx.fillStyle = '#5b3a1e'; ctx.fillRect(x + 20, gy - 28, 6, 28); ctx.fillRect(x + 70, gy - 28, 6, 28);
+    rrect(ctx, x, gy - 78, 100, 52, 6);
+    ctx.fillStyle = '#2b6fc2'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#cfe6ff'; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + 20, gy - 52, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2b6fc2'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x + 20, gy - 52); ctx.lineTo(x + 20, gy - 59); ctx.moveTo(x + 20, gy - 52); ctx.lineTo(x + 26, gy - 52); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 10px Arial, sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(s.l1, x + 36, gy - 54);
+    ctx.fillText(s.l2, x + 36, gy - 40);
+  }
+}
+
+</script>
+<!-- UI & game -->
+<script>
+/* js/ui/ui.js */
+/* ============================================================
+   ui.js — HUD (score/lives/level/time), overlay, kuis, dashboard
+   Semua interaksi dikirim ke Game lewat objek `handlers`.
+   ============================================================ */
+const NAME_MAX = 12;
+const NAME_BAD = /[^\p{L}\p{N} ._-]/gu;
+
+class UI {
+  constructor(handlers) {
+    this.h = handlers;
+    this.cache = {};
+    this.qs = null;
+    this.prevOverlay = 'menu';
+    this.toastTimer = 0;
+    this.heartImgs = { full: Sprites.heartURL(true), empty: Sprites.heartURL(false) };
+    this.drawAvatar();
+    this.bind();
+  }
+
+  $(id) { return document.getElementById(id); }
+
+  /** Nama pemain: huruf/angka/spasi/titik/strip/underscore, maks. 12 karakter */
+  cleanName(v) { return String(v || '').normalize('NFC').replace(NAME_BAD, '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX); }
+
+  /** Mulai game bila nama sudah diisi; jika kosong, minta pemain mengisi namanya */
+  tryStart() {
+    const name = this.cleanName(this.$('name-input').value);
+    if (!name) {
+      const input = this.$('name-input'), err = this.$('name-err');
+      err.hidden = false;
+      input.classList.remove('shake'); void input.offsetWidth; input.classList.add('shake');
+      input.focus();
+      return;
+    }
+    this.h.onStart(name);
+  }
+
+  drawAvatar() {
+    const g = this.$('avatar').getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#bfe3ff'; g.fillRect(0, 0, 48, 48);
+    g.drawImage(Sprites.player.idle, 0, 0, 36, 33, 0, 6, 48, 44);
+  }
+
+  bind() {
+    const click = (id, fn) => this.$(id).addEventListener('click', e => { e.currentTarget.blur(); fn(); });
+    const input = this.$('name-input');
+    click('btn-start', () => this.tryStart());
+    click('btn-fs', () => this.h.onFullscreen());
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); this.tryStart(); } });
+    // bersihkan karakter yang tidak diizinkan saat mengetik, sembunyikan pesan error
+    input.addEventListener('input', () => {
+      const clean = input.value.replace(NAME_BAD, '');
+      if (clean !== input.value) input.value = clean;
+      this.$('name-err').hidden = true;
+    });
+    click('btn-board', () => this.showDashboard('menu'));
+    click('btn-resume', () => this.h.onResume());
+    click('btn-pause-menu', () => this.h.onMenu());
+    click('btn-next', () => this.h.onNext());
+    click('btn-again', () => this.h.onAgain());
+    click('btn-go-menu', () => this.h.onMenu());
+    click('btn-go-board', () => this.showDashboard('gameover'));
+    click('btn-db-back', () => this.show(this.prevOverlay));
+    click('btn-db-clear', () => {
+      if (confirm('Hapus semua data skor tertinggi?')) { Store.clear(); this.h.onScoresCleared(); this.showDashboard(this.prevOverlay); }
+    });
+    click('btn-hint', () => this.useHint());
+    click('btn-q-next', () => this.h.onQuizDone());
+  }
+
+  /* ---------------- HUD ---------------- */
+  setText(id, v) {
+    if (this.cache[id] !== v) { this.cache[id] = v; this.$(id).textContent = v; }
+  }
+
+  showHud(on) { this.$('hud').hidden = !on; this.$('hud-sub').hidden = !on; }
+
+  setHud(score, time, hi) {
+    this.setText('score', String(score));
+    this.setText('time', fmtTime(time));
+    this.setText('hiscore', String(hi));
+    this.$('time').classList.toggle('low', time < 30);
+  }
+
+  setHearts(n) {
+    if (this.cache.hearts === n) return;
+    this.cache.hearts = n;
+    const box = this.$('hearts');
+    box.innerHTML = '';
+    for (let i = 0; i < CFG.lives; i++) {
+      const im = document.createElement('img');
+      im.src = i < n ? this.heartImgs.full : this.heartImgs.empty;
+      box.appendChild(im);
+    }
+  }
+
+  setPlayer(name) { this.setText('pname', name); }
+  setLevel(n, total, target) { this.setText('lvl', `Level ${n}/${total}`); this.setText('target', target); }
+
+  toast(msg) {
+    const t = this.$('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => t.classList.remove('show'), 1900);
+  }
+
+  /* ---------------- overlay ---------------- */
+  show(id) { this.hideAll(); this.$(id).classList.add('show'); }
+  hideAll() { document.querySelectorAll('.overlay').forEach(o => o.classList.remove('show')); }
+
+  showMenu() {
+    this.$('name-input').value = Store.getName();
+    this.$('name-err').hidden = true;
+    const l = Store.scores();
+    this.$('menu-best').textContent = l.length ? `Skor tertinggi: ${l[0].score}  (${l[0].name})` : 'Belum ada skor — jadilah yang pertama!';
+    this.show('menu');
+  }
+
+  renderBoard(table, entries, hl = -1) {
+    table.innerHTML = '<tr><th>#</th><th>Nama</th><th>Skor</th><th>Level</th><th>Tanggal</th></tr>';
+    if (!entries.length) {
+      table.insertAdjacentHTML('beforeend', '<tr class="empty"><td colspan="5">Belum ada skor tersimpan.</td></tr>');
+      return;
+    }
+    entries.forEach((e, i) => {
+      const tr = document.createElement('tr');
+      if (i === hl) tr.className = 'me';
+      [i + 1, e.name, e.score, e.level, e.date].forEach((v, k) => {
+        const td = document.createElement('td');
+        td.textContent = v;
+        if (k === 0 || k === 2) td.className = 'n';
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+  }
+
+  showDashboard(from) {
+    this.prevOverlay = from;
+    const l = Store.scores();
+    this.$('db-summary').innerHTML = l.length
+      ? `Skor terbaik: <b>${l[0].score}</b> oleh <b></b> · Total permainan tersimpan: <b>${l.length}</b>`
+      : 'Mainkan game untuk mengisi dashboard ini.';
+    if (l.length) this.$('db-summary').querySelectorAll('b')[1].textContent = l[0].name;
+    this.renderBoard(this.$('db-board'), l);
+    this.show('dashboard');
+  }
+
+  showLevelClear(title, rows, nextLabel) {
+    this.$('lc-title').textContent = title;
+    const t = this.$('lc-stats');
+    t.innerHTML = '';
+    rows.forEach(([a, b]) => {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'), td2 = document.createElement('td');
+      td1.textContent = a; td2.textContent = b;
+      tr.append(td1, td2); t.appendChild(tr);
+    });
+    this.$('btn-next').textContent = nextLabel;
+    this.show('levelclear');
+  }
+
+  showEnd({ victory, score, msg, rank, entries }) {
+    this.$('go-title').textContent = victory ? '🎓 SELAMAT, KAMU LULUS!' : 'GAME OVER';
+    this.$('go-msg').textContent = msg;
+    this.$('go-score').textContent = String(score);
+    this.$('go-rank').textContent = rank >= 0 ? (rank === 0 ? '🏆 Skor tertinggi baru!' : `Peringkat #${rank + 1} di dashboard`) : 'Belum masuk 10 besar.';
+    this.renderBoard(this.$('go-board'), entries.slice(0, 5), rank);
+    this.show('gameover');
+  }
+
+  /* ---------------- kuis ---------------- */
+  showQuiz(q, score) {
+    const order = shuffle([0, 1, 2, 3]);
+    this.qs = { q, order, answered: false, hinted: false };
+    const cat = this.$('q-cat');
+    cat.textContent = CAT[q.c].name;
+    cat.className = 'badge ' + q.c;
+    this.$('q-bonus').textContent = `Bonus +${CFG.questionBonus}`;
+    this.$('q-text').textContent = q.q;
+    const box = this.$('q-opts');
+    box.innerHTML = '';
+    order.forEach((oi, n) => {
+      const b = document.createElement('button');
+      b.className = 'opt';
+      b.dataset.i = oi;
+      const k = document.createElement('span'); k.className = 'k'; k.textContent = n + 1;
+      const t = document.createElement('span'); t.textContent = q.o[oi];
+      b.append(k, t);
+      b.addEventListener('click', () => this.pick(oi));
+      box.appendChild(b);
+    });
+    this.$('q-hint').hidden = true;
+    this.$('q-feedback').hidden = true;
+    this.$('btn-q-next').hidden = true;
+    this.$('hint-cost').textContent = `🪙 ${CFG.hintCost}`;
+    this.updateHintButton(score);
+    this.show('quiz');
+  }
+
+  updateHintButton(score) {
+    const b = this.$('btn-hint');
+    b.disabled = !this.qs || this.qs.answered || this.qs.hinted || score < CFG.hintCost;
+    b.hidden = !!(this.qs && this.qs.answered);
+  }
+
+  btnFor(oi) { return this.$('q-opts').querySelector(`[data-i="${oi}"]`); }
+
+  pick(oi) {
+    const s = this.qs;
+    if (!s || s.answered) return;
+    const btn = this.btnFor(oi);
+    if (btn.disabled) return;
+    s.answered = true;
+    const ok = oi === s.q.a;
+    const pts = this.h.onAnswer(ok, s.hinted);
+    this.$('q-opts').querySelectorAll('.opt').forEach(b => { b.disabled = true; });
+    this.btnFor(s.q.a).classList.add('correct');
+    if (!ok) btn.classList.add('wrong');
+
+    const fb = this.$('q-feedback');
+    fb.className = 'feedback ' + (ok ? 'ok' : 'no');
+    fb.innerHTML = '';
+    const head = document.createElement('b');
+    head.textContent = ok ? `✔ Benar! +${pts} poin` : `✘ Belum tepat (+${pts} poin partisipasi)`;
+    const body = document.createElement('span');
+    body.textContent = (ok ? '' : `Jawaban benar: ${s.q.o[s.q.a]}. `) + s.q.e;
+    fb.append(head, body);
+    fb.hidden = false;
+    this.$('q-hint').hidden = true;
+    this.$('btn-hint').hidden = true;
+    this.$('btn-q-next').hidden = false;
+  }
+
+  pickByNumber(n) {
+    if (!this.qs) return;
+    const oi = this.qs.order[n];
+    if (oi !== undefined) this.pick(oi);
+  }
+
+  useHint() {
+    const s = this.qs;
+    if (!s || s.answered || s.hinted) return;
+    if (!this.h.onHint()) return;
+    s.hinted = true;
+    const hb = this.$('q-hint');
+    hb.textContent = '💡 ' + s.q.h;
+    hb.hidden = false;
+    shuffle([0, 1, 2, 3].filter(i => i !== s.q.a)).slice(0, 2).forEach(i => {
+      const b = this.btnFor(i);
+      b.disabled = true; b.classList.add('gone');
+    });
+    this.$('btn-hint').disabled = true;
+  }
+
+  get quizAnswered() { return !!(this.qs && this.qs.answered); }
+}
+
+</script>
+<script>
+/* js/ui/touch.js */
+/* ============================================================
+   touch.js — kontrol layar sentuh (HP & tablet)
+   D-pad kiri/kanan, tombol Lompat & Lari, serta tombol jeda,
+   suara, dan layar penuh. Memakai Pointer Events (multi-touch),
+   sehingga bisa berjalan + melompat sekaligus.
+   ============================================================ */
+class TouchControls {
+  constructor(input, cb) {
+    this.input = input;
+    this.cb = cb;
+    this.resets = [];
+    const $ = id => document.getElementById(id);
+
+    this.bindDpad($('dpad'));
+    this.bindHold($('t-jump'), 'Space');
+    this.bindHold($('t-run'), 'ShiftLeft');
+    this.bindTap($('t-pause'), () => cb.onPause());
+    this.bindTap($('t-mute'), () => cb.onMute());
+    this.bindTap($('t-fs'), () => cb.onFullscreen());
+
+    // cegah menu konteks (tekan lama) & zoom cubit di area game
+    const stage = $('stage');
+    stage.addEventListener('contextmenu', e => { if (!/INPUT|TEXTAREA/.test(e.target.tagName)) e.preventDefault(); });
+    ['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+  }
+
+  bindHold(el, code) {
+    const ids = new Set();
+    const release = () => { ids.clear(); el.classList.remove('on'); this.input.vRelease(code); };
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      ids.add(e.pointerId);
+      try { el.setPointerCapture(e.pointerId); } catch (err) { /* abaikan */ }
+      el.classList.add('on');
+      this.input.vPress(code);
+    });
+    const up = e => { if (ids.delete(e.pointerId) && ids.size === 0) release(); };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => el.addEventListener(t, up));
+    this.resets.push(release);
+  }
+
+  bindDpad(pad) {
+    const L = pad.querySelector('[data-k="left"]'), R = pad.querySelector('[data-k="right"]');
+    let pid = null;
+    const set = (l, r) => {
+      l ? this.input.vPress('ArrowLeft') : this.input.vRelease('ArrowLeft');
+      r ? this.input.vPress('ArrowRight') : this.input.vRelease('ArrowRight');
+      L.classList.toggle('on', l); R.classList.toggle('on', r);
+    };
+    const apply = e => {
+      const b = pad.getBoundingClientRect();
+      const x = (e.clientX - b.left) / b.width;
+      set(x < 0.5, x >= 0.5);
+    };
+    pad.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      pid = e.pointerId;
+      try { pad.setPointerCapture(pid); } catch (err) { /* abaikan */ }
+      apply(e);
+    });
+    pad.addEventListener('pointermove', e => { if (e.pointerId === pid) apply(e); });
+    const up = e => { if (e.pointerId === pid) { pid = null; set(false, false); } };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => pad.addEventListener(t, up));
+    this.resets.push(() => { pid = null; set(false, false); });
+  }
+
+  bindTap(el, fn) {
+    el.addEventListener('click', e => { e.preventDefault(); e.currentTarget.blur(); fn(); });
+  }
+
+  /** Lepas semua tombol (dipanggil saat game keluar dari state "playing") */
+  releaseAll() { this.resets.forEach(f => f()); this.input.vClear(); }
+}
+
+</script>
+<script>
+/* js/ui/display.js */
+/* ============================================================
+   display.js — penyesuaian tampilan perangkat
+   • mendeteksi layar sentuh  → kelas "touch" pada <html>
+   • layar penuh (fullscreen) + kunci orientasi landscape bila didukung
+   • mode penskalaan canvas: halus saat diperkecil, tajam saat diperbesar
+   ============================================================ */
+const Display = (() => {
+  const root = document.documentElement;
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const portraitPhone = window.matchMedia('(orientation: portrait) and (pointer: coarse) and (max-width: 700px)');
+
+  const api = {
+    portraitPhone,
+
+    init() {
+      // layar sentuh: dari awal (pointer: coarse) atau saat disentuh pertama kali
+      if (window.matchMedia('(pointer: coarse)').matches) root.classList.add('touch');
+      window.addEventListener('touchstart', () => root.classList.add('touch'), { once: true, passive: true });
+
+      const canvas = document.getElementById('game');
+      const fit = () => {
+        const cssW = canvas.getBoundingClientRect().width * (window.devicePixelRatio || 1);
+        canvas.style.imageRendering = cssW > RENDER_W * 1.02 ? 'pixelated' : 'auto';
+      };
+      fit();
+      window.addEventListener('resize', fit);
+      window.addEventListener('orientationchange', fit);
+
+      const sync = () => root.classList.toggle('is-fs', !!fsEl());
+      document.addEventListener('fullscreenchange', sync);
+      document.addEventListener('webkitfullscreenchange', sync);
+
+      // tombol "tetap main di portrait"
+      const stay = document.getElementById('rotate-stay');
+      if (stay) stay.addEventListener('click', () => document.getElementById('rotate').classList.add('dismissed'));
+
+      if (!api.canFullscreen()) document.querySelectorAll('.fs-only').forEach(el => { el.hidden = true; });
+    },
+
+    canFullscreen() {
+      return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+    },
+
+    toggleFullscreen() {
+      if (!api.canFullscreen()) return;
+      if (fsEl()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        return;
+      }
+      const el = root;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      const p = req.call(el);
+      const lock = () => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) { /* abaikan */ } };
+      if (p && p.then) p.then(lock).catch(() => {}); else lock();
+    }
+  };
+  return api;
+})();
+
+</script>
+<script>
+/* js/game.js */
+/* ============================================================
+   game.js — kelas Game: state machine, loop (fixed timestep),
+   skor, nyawa, kuis, level, kamera, partikel, rendering
+   State: menu | playing | paused | quiz | levelclear | gameover
+   Resolusi canvas 1920x1080: dunia game (960x540) digambar 2x.
+   ============================================================ */
+class Game {
+  get state() { return this._state; }
+  set state(v) {
+    this._state = v;
+    document.body.dataset.state = v;                       // dipakai CSS (mis. tombol sentuh)
+    if (v !== 'playing' && this.touch) this.touch.releaseAll();
+  }
+
+  constructor() {
+    Sprites.init();
+    Display.init();
+    this.canvas = document.getElementById('game');
+    this.canvas.width = RENDER_W;                          // 1920
+    this.canvas.height = RENDER_H;                         // 1080
+    this.ctx = this.canvas.getContext('2d');
+    this.input = new Input();
+    this.sound = new Sound();
+    this.touch = new TouchControls(this.input, {
+      onPause: () => this.pause(),
+      onMute: () => this.toggleMute(),
+      onFullscreen: () => Display.toggleFullscreen()
+    });
+
+    this.ui = new UI({
+      onStart: name => this.startNewGame(name),
+      onAgain: () => this.startNewGame(this.playerName),
+      onMenu: () => this.toMenu(),
+      onResume: () => this.resume(),
+      onNext: () => this.nextLevel(),
+      onAnswer: (ok, hinted) => this.answerQuiz(ok, hinted),
+      onHint: () => this.buyHint(),
+      onQuizDone: () => this.closeQuiz(),
+      onScoresCleared: () => { this.hi = 0; },
+      onFullscreen: () => Display.toggleFullscreen()
+    });
+
+    // jeda otomatis saat tab disembunyikan atau HP masih posisi portrait
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.pause(); });
+    const mq = Display.portraitPhone, onPortrait = e => { if (e.matches) this.pause(); };
+    if (mq.addEventListener) mq.addEventListener('change', onPortrait); else if (mq.addListener) mq.addListener(onPortrait);
+
+    this.playerName = Store.getName();
+    this.hi = Store.best();
+    this.t = 0;
+    this.acc = 0;
+    this.last = 0;
+    this.camX = 0;
+    this.particles = [];
+    this.texts = [];
+    this.score = 0;
+    this.lives = CFG.lives;
+    this.levelIndex = 0;
+    this.pendingQ = null;
+
+    this.bank = new QuestionBank(QUESTIONS);
+    this.state = 'menu';
+    this.loadLevel(0);
+    this.ui.showMenu();
+  }
+
+  run() {
+    const loop = ts => {
+      const dt = Math.min(0.1, (ts - this.last) / 1000 || 0);
+      this.last = ts;
+      this.acc += dt;
+      let steps = 0;
+      while (this.acc >= STEP) { this.update(STEP); this.acc -= STEP; steps++; }
+      if (steps > 0) this.input.endFrame();
+      this.render();
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------------- alur game ---------------- */
+  startNewGame(name) {
+    this.sound.init();
+    this.playerName = (name || 'Pemain').slice(0, 12);
+    Store.setName(this.playerName);
+    this.score = 0;
+    this.lives = CFG.lives;
+    this.levelIndex = 0;
+    this.stats = { coins: 0, correct: 0, total: 0 };
+    this.bank = new QuestionBank(QUESTIONS);
+    this.loadLevel(0);
+    this.ui.setPlayer(this.playerName);
+    this.ui.hideAll();
+    this.ui.showHud(true);
+    this.state = 'playing';
+    this.ui.toast(`Level 1 — Target: ${this.level.target}`);
+  }
+
+  toMenu() {
+    this.state = 'menu';
+    this.levelIndex = 0;
+    this.loadLevel(0);
+    this.ui.showHud(false);
+    this.ui.showMenu();
+  }
+
+  loadLevel(i) {
+    const def = LEVEL_DEFS[i];
+    this.level = new Level(def, this.bank);
+    this.player = new Player(this.level.start.x, this.level.start.y);
+    this.timeLeft = def.time;
+    this.camX = 0;
+    this.particles = [];
+    this.texts = [];
+    this.levelStats = { coins: 0, correct: 0, total: 0 };
+    this.ui.setLevel(i + 1, LEVEL_DEFS.length, def.target);
+    this.ui.setHearts(this.lives);
+  }
+
+  pause() {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    this.ui.show('pause');
+  }
+
+  resume() { if (this.state === 'paused') { this.state = 'playing'; this.ui.hideAll(); } }
+
+  toggleMute() {
+    this.sound.muted = !this.sound.muted;
+    const b = document.getElementById('t-mute');
+    if (b) b.textContent = this.sound.muted ? '🔇' : '🔊';
+    this.ui.toast(this.sound.muted ? 'Suara: mati' : 'Suara: nyala');
+  }
+
+  nextLevel() {
+    if (this.state !== 'levelclear') return;
+    if (this.levelIndex >= LEVEL_DEFS.length - 1) { this.finishGame(true); return; }
+    this.levelIndex++;
+    this.loadLevel(this.levelIndex);
+    this.state = 'playing';
+    this.ui.hideAll();
+    this.ui.toast(`Level ${this.levelIndex + 1} — Target: ${this.level.target}`);
+  }
+
+  completeLevel() {
+    this.state = 'levelclear';
+    this.sound.play('win');
+    const tb = Math.floor(this.timeLeft) * CFG.timeBonusPerSec;
+    this.addScore(tb + CFG.levelBonus);
+    const ls = this.levelStats, last = this.levelIndex >= LEVEL_DEFS.length - 1;
+    this.ui.showLevelClear(
+      `Level ${this.levelIndex + 1} Selesai!`,
+      [['Koin terkumpul', ls.coins], ['Soal benar', `${ls.correct}/${ls.total}`],
+       ['Bonus waktu', '+' + tb], ['Bonus level', '+' + CFG.levelBonus], ['Skor total', this.score]],
+      last ? 'Selesai ⏎' : `Lanjut ke Level ${this.levelIndex + 2} ⏎`
+    );
+  }
+
+  finishGame(victory) {
+    if (victory) this.addScore(this.lives * CFG.lifeBonus);
+    this.state = 'gameover';
+    this.sound.play(victory ? 'win' : 'over');
+    const rank = Store.add({
+      name: this.playerName, score: this.score,
+      level: victory ? LEVEL_DEFS.length : this.levelIndex + 1,
+      date: new Date().toLocaleDateString('id-ID')
+    });
+    this.hi = Math.max(this.hi, Store.best());
+    this.ui.showEnd({
+      victory, score: this.score, rank, entries: Store.scores(),
+      msg: victory
+        ? `${this.playerName} berhasil melewati semua level! Sisa nyawa memberi bonus +${this.lives * CFG.lifeBonus}.`
+        : `Nyawa habis di Level ${this.levelIndex + 1}. Ayo coba lagi, ${this.playerName}!`
+    });
+  }
+
+  /* ---------------- skor, nyawa ---------------- */
+  addScore(n) { this.score += n; if (this.score > this.hi) this.hi = this.score; }
+
+  floatText(x, y, text, color = '#fff') { this.texts.push({ x, y, text, color, life: 0.9 }); }
+
+  burst(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      this.particles.push({
+        x, y, vx: (Math.random() - 0.5) * 160, vy: -Math.random() * 200 - 40,
+        life: 0.4 + Math.random() * 0.3, max: 0.7, color, size: 2 + Math.random() * 3
+      });
+    }
+  }
+
+  hurtPlayer(src) {
+    const p = this.player;
+    if (p.invincible > 0) return;
+    this.lives--;
+    this.ui.setHearts(this.lives);
+    this.sound.play('hurt');
+    if (this.lives <= 0) { this.finishGame(false); return; }
+    p.invincible = CFG.invincible;
+    p.vy = -420;
+    p.vx = (p.cx < src.cx ? -1 : 1) * 220;
+    p.knock = 0.25;
+  }
+
+  loseLife(reason) {
+    this.lives--;
+    this.ui.setHearts(this.lives);
+    this.sound.play('hurt');
+    if (this.lives <= 0) { this.finishGame(false); return; }
+    if (reason === 'time') this.timeLeft = this.level.time;
+    this.player.respawn(this.player.safe);
+    this.camX = clamp(this.player.cx - VIEW_W * 0.4, 0, this.level.width - VIEW_W);
+    this.sound.play('respawn');
+    this.ui.toast(reason === 'time' ? 'Waktu habis! Nyawa berkurang' : 'Jatuh! Nyawa berkurang');
+  }
+
+  /* ---------------- kuis ---------------- */
+  openQuiz(qc) {
+    this.state = 'quiz';
+    this.pendingQ = qc;
+    this.sound.play('qcoin');
+    this.ui.showQuiz(qc.question, this.score);
+  }
+
+  answerQuiz(ok, hinted) {
+    const pts = ok ? CFG.questionBonus : CFG.answerPoints;
+    this.addScore(pts);
+    this.levelStats.total++;
+    if (ok) this.levelStats.correct++;
+    this.sound.play(ok ? 'correct' : 'wrong');
+    return pts;
+  }
+
+  buyHint() {
+    if (this.score < CFG.hintCost) return false;
+    this.score -= CFG.hintCost;
+    this.sound.play('hint');
+    return true;
+  }
+
+  closeQuiz() {
+    if (this.state !== 'quiz') return;
+    const qc = this.pendingQ;
+    this.level.qcoins = this.level.qcoins.filter(q => q !== qc);
+    this.pendingQ = null;
+    this.ui.qs = null;
+    this.state = 'playing';
+    this.ui.hideAll();
+  }
+
+  /* ---------------- update ---------------- */
+  update(dt) {
+    this.t += dt;
+    const inp = this.input;
+
+    switch (this.state) {
+      case 'playing': this.updatePlaying(dt); break;
+      case 'paused':
+        if (inp.wasPressed('KeyP', 'Escape')) this.resume();
+        break;
+      case 'quiz':
+        for (let n = 1; n <= 4; n++) if (inp.wasPressed('Digit' + n, 'Numpad' + n)) this.ui.pickByNumber(n - 1);
+        if (inp.wasPressed('KeyH')) { this.ui.useHint(); }
+        if (this.ui.quizAnswered && inp.wasPressed('Enter', 'Space', 'NumpadEnter')) this.closeQuiz();
+        this.ui.updateHintButton(this.score);
+        break;
+      case 'levelclear':
+        if (inp.wasPressed('Enter', 'Space', 'NumpadEnter')) this.nextLevel();
+        break;
+      case 'gameover':
+        if (inp.wasPressed('Enter', 'NumpadEnter')) this.startNewGame(this.playerName);
+        else if (inp.wasPressed('Escape')) this.toMenu();
+        break;
+      case 'menu':
+        if (inp.wasPressed('Enter', 'NumpadEnter') && document.getElementById('menu').classList.contains('show'))
+          this.ui.tryStart();
+        break;
+    }
+    this.updateEffects(dt);
+  }
+
+  updatePlaying(dt) {
+    const inp = this.input, lv = this.level, p = this.player;
+
+    if (inp.wasPressed('KeyP', 'Escape')) { this.pause(); return; }
+    if (inp.wasPressed('KeyM')) this.toggleMute();
+
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) { this.loseLife('time'); return; }
+
+    p.update(dt, this);
+    for (const e of lv.enemies) e.update(dt, this);
+    lv.enemies = lv.enemies.filter(e => !e.dead);
+
+    // koin biasa
+    for (const c of lv.coins) {
+      if (overlap(p, c)) {
+        c.taken = true;
+        this.addScore(CFG.coinPoints);
+        this.levelStats.coins++;
+        this.sound.play('coin');
+        this.floatText(c.x, c.y, '+' + CFG.coinPoints, '#ffe066');
+        this.burst(c.x + 12, c.y + 12, '#ffd23f', 4);
+      }
+    }
+    lv.coins = lv.coins.filter(c => !c.taken);
+
+    // koin tanda tanya -> kuis
+    for (const qc of lv.qcoins) {
+      if (overlap(p, qc)) { this.openQuiz(qc); return; }
+    }
+
+    // musuh
+    for (const e of lv.enemies) {
+      if (e.squash > 0 || !overlap(p, e.hit)) continue;
+      if (e.stompable && p.vy > 60 && (p.y + p.h) - e.y < 26) {
+        e.squash = 0.35; e.vx = 0;
+        p.vy = inp.jumpDown ? -640 : -440;
+        this.addScore(CFG.stompPoints);
+        this.sound.play('stomp');
+        this.floatText(e.x, e.y - 10, '+' + CFG.stompPoints, '#ffffff');
+        this.burst(e.cx, e.cy, '#ffffff', 8);
+      } else if (p.invincible <= 0) {
+        this.hurtPlayer(e);
+        if (this.state !== 'playing') return;
+      }
+    }
+
+    // duri
+    for (const s of lv.spikes) {
+      if (p.invincible <= 0 && overlap(p, s.hit)) {
+        this.hurtPlayer({ cx: s.x + 20 });
+        if (this.state !== 'playing') return;
+      }
+    }
+
+    // finish
+    if (overlap(p, lv.goal.hit)) { this.completeLevel(); return; }
+
+    // jatuh ke jurang
+    if (p.y > lv.rows * TILE + 40) this.loseLife('fall');
+    if (this.state !== 'playing') return;
+
+    // kamera halus
+    const target = clamp(p.cx - VIEW_W * 0.4 + p.facing * 40, 0, lv.width - VIEW_W);
+    this.camX += (target - this.camX) * Math.min(1, dt * 8);
+  }
+
+  updateEffects(dt) {
+    for (const p of this.particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; p.life -= dt; }
+    this.particles = this.particles.filter(p => p.life > 0);
+    for (const t of this.texts) { t.y -= 40 * dt; t.life -= dt; }
+    this.texts = this.texts.filter(t => t.life > 0);
+  }
+
+  /* ---------------- render ---------------- */
+  render() {
+    const ctx = this.ctx, lv = this.level, cam = Math.round(this.camX);
+    ctx.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, -CAM_Y * RENDER_SCALE);   // dunia 960x540 -> 1920x1080
+    ctx.imageSmoothingEnabled = false;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+
+    lv.drawBackground(ctx, cam, this.t);
+
+    ctx.save();
+    ctx.translate(-cam, 0);
+    lv.drawTiles(ctx, cam, this.t);
+    for (const s of lv.spikes) s.draw(ctx);
+    lv.goal.draw(ctx, this);
+    for (const c of lv.coins) c.draw(ctx, this);
+    for (const e of lv.enemies) e.draw(ctx, this);
+    this.player.draw(ctx, this);
+    for (const q of lv.qcoins) q.draw(ctx, this);
+
+    for (const p of this.particles) {
+      ctx.globalAlpha = clamp(p.life / p.max, 0, 1);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold 14px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    for (const t of this.texts) {
+      ctx.globalAlpha = clamp(t.life / 0.5, 0, 1);
+      ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t.text, t.x, t.y);
+      ctx.fillStyle = t.color; ctx.fillText(t.text, t.x, t.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (this.state !== 'menu') this.ui.setHud(this.score, this.timeLeft, this.hi);
+  }
+}
+
+</script>
+<script>
+/* js/main.js */
+/* ============================================================
+   main.js — titik masuk aplikasi
+   ============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  window.game = new Game();
+  window.game.run();
+});
+
+</script>
+</body>
+</html>
